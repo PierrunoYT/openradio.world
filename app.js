@@ -866,89 +866,34 @@
       }
 
       const markers = places.filter((place) => Array.isArray(place.geo) && place.geo.length === 2);
-      function columnRadiusMeters(place) {
-        const stationWeight = Math.log1p(Number(place.size) || 0);
-        return 2600 + Math.min(2000, stationWeight * 360);
-      }
-      function columnHeightMeters(place) {
-        return Math.round(160000 + Math.min(240000, Math.log1p(Number(place.size) || 0) * 40000));
-      }
-
-      // Custom WebGL layer: all spikes render as one instanced draw call of
-      // octagonal prisms. MapLibre's injected shader prelude (projectTileFor3D)
-      // places them on the globe or mercator plane, including the projection
-      // transition and horizon clipping. A second on-demand pass renders each
-      // spike's id as a color into an offscreen buffer, so hover/click picking
-      // is pixel-exact anywhere on a spike's visible body.
-      function createSpikeLayer() {
-        const SIDES = 8;
-        const template = [];
-        const lightX = 0.55;
-        const lightY = -0.84;
-        for (let side = 0; side < SIDES; side += 1) {
-          const angle0 = (side / SIDES) * Math.PI * 2;
-          const angle1 = ((side + 1) / SIDES) * Math.PI * 2;
-          const x0 = Math.cos(angle0);
-          const y0 = Math.sin(angle0);
-          const x1 = Math.cos(angle1);
-          const y1 = Math.sin(angle1);
-          const normalX = Math.cos((angle0 + angle1) / 2);
-          const normalY = Math.sin((angle0 + angle1) / 2);
-          const shade = 0.6 + 0.4 * Math.max(0, normalX * lightX + normalY * lightY);
-          template.push(
-            x0, y0, 0, shade, x1, y1, 0, shade, x0, y0, 1, shade,
-            x0, y0, 1, shade, x1, y1, 0, shade, x1, y1, 1, shade,
-          );
-        }
-        for (let side = 0; side < SIDES; side += 1) {
-          const angle0 = (side / SIDES) * Math.PI * 2;
-          const angle1 = ((side + 1) / SIDES) * Math.PI * 2;
-          template.push(
-            0, 0, 1, 1.2,
-            Math.cos(angle0), Math.sin(angle0), 1, 1.2,
-            Math.cos(angle1), Math.sin(angle1), 1, 1.2,
-          );
-        }
-        const templateVertexCount = template.length / 4;
+      // Custom WebGL layer: Radio Garden-style markers. All 12,326 places
+      // render as one instanced draw of camera-facing glowing green dots
+      // hugging the satellite surface at a constant screen size. MapLibre's
+      // injected shader prelude (projectTileFor3D) places them on the globe
+      // or mercator plane, including the projection transition, and clips
+      // the back hemisphere. A second on-demand pass renders each dot's id
+      // as a color into an offscreen buffer, so hover/click picking is
+      // pixel-exact.
+      function createMarkerLayer() {
         const quadTemplate = [-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1];
 
-        const INSTANCE_STRIDE = 7;
+        const INSTANCE_STRIDE = 5;
         const instanceData = new Float32Array(markers.length * INSTANCE_STRIDE);
         markers.forEach((place, index) => {
           const mercator = maplibregl.MercatorCoordinate.fromLngLat(
             { lng: Number(place.geo[0]), lat: Number(place.geo[1]) },
             0,
           );
-          const metersToMercator = mercator.meterInMercatorCoordinateUnits();
           const id = index + 1;
           const offset = index * INSTANCE_STRIDE;
           instanceData[offset] = mercator.x;
           instanceData[offset + 1] = mercator.y;
-          instanceData[offset + 2] = columnRadiusMeters(place) * metersToMercator;
-          instanceData[offset + 3] = columnHeightMeters(place);
-          instanceData[offset + 4] = (id & 255) / 255;
-          instanceData[offset + 5] = ((id >> 8) & 255) / 255;
-          instanceData[offset + 6] = ((id >> 16) & 255) / 255;
+          instanceData[offset + 2] = (id & 255) / 255;
+          instanceData[offset + 3] = ((id >> 8) & 255) / 255;
+          instanceData[offset + 4] = ((id >> 16) & 255) / 255;
         });
 
         const PICK_DOWNSCALE = 2;
-        const fragmentSource = `#version 300 es
-precision highp float;
-in float v_up;
-flat in float v_shade;
-flat in vec3 v_pick;
-uniform float u_pick_mode;
-out vec4 fragColor;
-void main() {
-  if (u_pick_mode > 0.5) {
-    fragColor = vec4(v_pick, 1.0);
-    return;
-  }
-  vec3 base = vec3(1.0, 0.176, 0.471);
-  vec3 color = base * (v_shade * mix(0.5, 1.0, v_up));
-  color = mix(color, vec3(1.0, 0.75, 0.88), v_up * v_up * 0.35);
-  fragColor = vec4(color, 1.0);
-}`;
         const dotFragmentSource = `#version 300 es
 precision highp float;
 in vec2 v_corner;
@@ -962,8 +907,8 @@ void main() {
     fragColor = vec4(v_pick, 1.0);
     return;
   }
-  float alpha = 1.0 - smoothstep(0.55, 1.0, dist);
-  vec3 color = mix(vec3(1.0, 0.62, 0.8), vec3(1.0, 0.176, 0.471), smoothstep(0.0, 0.9, dist));
+  float alpha = 1.0 - smoothstep(0.58, 1.0, dist);
+  vec3 color = mix(vec3(0.55, 1.0, 0.65), vec3(0.05, 0.78, 0.36), smoothstep(0.12, 0.85, dist));
   fragColor = vec4(color * alpha, alpha);
 }`;
 
@@ -982,18 +927,19 @@ void main() {
           gl.deleteShader(vertexShader);
           gl.deleteShader(fragmentShader);
           if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-            console.error('Spike layer shader failed to link:', gl.getProgramInfoLog(program));
+            console.error('Marker layer shader failed to link:', gl.getProgramInfoLog(program));
           }
           const uniforms = {};
           [
             'u_projection_matrix', 'u_projection_fallback_matrix', 'u_projection_tile_mercator_coords',
             'u_projection_clipping_plane', 'u_projection_transition', 'u_pick_mode', 'u_viewport',
+            'u_dot_radius',
           ].forEach((name) => { uniforms[name] = gl.getUniformLocation(program, name); });
           return { program, uniforms };
         }
 
         return {
-          id: 'place-spikes',
+          id: 'place-markers',
           type: 'custom',
           renderingMode: '3d',
           programs: new Map(),
@@ -1001,9 +947,6 @@ void main() {
 
           onAdd(mapInstance, gl) {
             this.map = mapInstance;
-            this.templateBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.templateBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(template), gl.STATIC_DRAW);
             this.quadBuffer = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quadTemplate), gl.STATIC_DRAW);
@@ -1014,88 +957,38 @@ void main() {
           },
 
           onRemove(mapInstance, gl) {
-            this.programs.forEach((entry) => {
-              gl.deleteProgram(entry.spike.program);
-              gl.deleteProgram(entry.dot.program);
-            });
+            this.programs.forEach((entry) => gl.deleteProgram(entry.program));
             this.programs.clear();
-            if (this.spikeVao) gl.deleteVertexArray(this.spikeVao);
             if (this.dotVao) gl.deleteVertexArray(this.dotVao);
-            if (this.templateBuffer) gl.deleteBuffer(this.templateBuffer);
             if (this.quadBuffer) gl.deleteBuffer(this.quadBuffer);
             if (this.instanceBuffer) gl.deleteBuffer(this.instanceBuffer);
             if (this.pickTexture) gl.deleteTexture(this.pickTexture);
-            if (this.pickDepth) gl.deleteRenderbuffer(this.pickDepth);
             if (this.pickFramebuffer) gl.deleteFramebuffer(this.pickFramebuffer);
           },
 
-          getPrograms(gl, shaderData) {
+          getProgram(gl, shaderData) {
             const cached = this.programs.get(shaderData.variantName);
             if (cached) return cached;
-            const spikeVertexSource = `#version 300 es
-${shaderData.vertexShaderPrelude}
-${shaderData.define}
-in vec2 a_offset;
-in float a_up;
-in float a_shade;
-in vec4 a_center;
-in vec3 a_pick;
-out float v_up;
-flat out float v_shade;
-flat out vec3 v_pick;
-void main() {
-  vec2 pos = a_center.xy + a_offset * a_center.z;
-  gl_Position = projectTileFor3D(pos, a_up * a_center.w);
-  v_up = a_up;
-  v_shade = a_shade;
-  v_pick = a_pick;
-}`;
             const dotVertexSource = `#version 300 es
 ${shaderData.vertexShaderPrelude}
 ${shaderData.define}
 in vec2 a_corner;
-in vec4 a_center;
+in vec2 a_center;
 in vec3 a_pick;
 uniform vec2 u_viewport;
+uniform float u_dot_radius;
 out vec2 v_corner;
 flat out vec3 v_pick;
 void main() {
-  vec4 tip = projectTileFor3D(a_center.xy, a_center.w);
-  float radiusPixels = 3.5 + (a_center.w - 160000.0) / 240000.0 * 3.0;
-  tip.xy += a_corner * radiusPixels * 2.0 * tip.w / u_viewport;
-  gl_Position = tip;
+  vec4 anchor = projectTileFor3D(a_center, 0.0);
+  anchor.xy += a_corner * u_dot_radius * 2.0 * anchor.w / u_viewport;
+  gl_Position = anchor;
   v_corner = a_corner;
   v_pick = a_pick;
 }`;
-            const entry = {
-              spike: buildProgram(gl, spikeVertexSource, fragmentSource, ['a_offset', 'a_up', 'a_shade', 'a_center', 'a_pick']),
-              dot: buildProgram(gl, dotVertexSource, dotFragmentSource, ['a_corner', 'a_center', 'a_pick']),
-            };
+            const entry = buildProgram(gl, dotVertexSource, dotFragmentSource, ['a_corner', 'a_center', 'a_pick']);
             this.programs.set(shaderData.variantName, entry);
             return entry;
-          },
-
-          getSpikeVao(gl) {
-            if (this.spikeVao) return this.spikeVao;
-            this.spikeVao = gl.createVertexArray();
-            gl.bindVertexArray(this.spikeVao);
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.templateBuffer);
-            gl.enableVertexAttribArray(0);
-            gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 16, 0);
-            gl.enableVertexAttribArray(1);
-            gl.vertexAttribPointer(1, 1, gl.FLOAT, false, 16, 8);
-            gl.enableVertexAttribArray(2);
-            gl.vertexAttribPointer(2, 1, gl.FLOAT, false, 16, 12);
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
-            gl.enableVertexAttribArray(3);
-            gl.vertexAttribPointer(3, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, 0);
-            gl.vertexAttribDivisor(3, 1);
-            gl.enableVertexAttribArray(4);
-            gl.vertexAttribPointer(4, 3, gl.FLOAT, false, INSTANCE_STRIDE * 4, 16);
-            gl.vertexAttribDivisor(4, 1);
-            gl.bindVertexArray(null);
-            gl.bindBuffer(gl.ARRAY_BUFFER, null);
-            return this.spikeVao;
           },
 
           getDotVao(gl) {
@@ -1107,19 +1000,21 @@ void main() {
             gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 8, 0);
             gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
             gl.enableVertexAttribArray(1);
-            gl.vertexAttribPointer(1, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, 0);
+            gl.vertexAttribPointer(1, 2, gl.FLOAT, false, INSTANCE_STRIDE * 4, 0);
             gl.vertexAttribDivisor(1, 1);
             gl.enableVertexAttribArray(2);
-            gl.vertexAttribPointer(2, 3, gl.FLOAT, false, INSTANCE_STRIDE * 4, 16);
+            gl.vertexAttribPointer(2, 3, gl.FLOAT, false, INSTANCE_STRIDE * 4, 8);
             gl.vertexAttribDivisor(2, 1);
             gl.bindVertexArray(null);
             gl.bindBuffer(gl.ARRAY_BUFFER, null);
             return this.dotVao;
           },
 
-          applyProjection(gl, programEntry, args, pickMode, viewportWidth, viewportHeight) {
+          drawScene(gl, programEntry, args, pickMode, viewportWidth, viewportHeight) {
             const projection = args.defaultProjectionData;
             const uniforms = programEntry.uniforms;
+            const canvas = this.map.getCanvas();
+            const pixelScale = viewportWidth / (canvas.clientWidth || viewportWidth);
             gl.useProgram(programEntry.program);
             gl.uniformMatrix4fv(uniforms.u_projection_matrix, false, projection.mainMatrix);
             gl.uniformMatrix4fv(uniforms.u_projection_fallback_matrix, false, projection.fallbackMatrix);
@@ -1127,24 +1022,18 @@ void main() {
             gl.uniform4f(uniforms.u_projection_clipping_plane, ...projection.clippingPlane);
             gl.uniform1f(uniforms.u_projection_transition, projection.projectionTransition);
             gl.uniform1f(uniforms.u_pick_mode, pickMode);
-            if (uniforms.u_viewport) gl.uniform2f(uniforms.u_viewport, viewportWidth, viewportHeight);
-          },
-
-          drawScene(gl, programs, args, pickMode, viewportWidth, viewportHeight) {
-            this.applyProjection(gl, programs.spike, args, pickMode, viewportWidth, viewportHeight);
-            gl.bindVertexArray(this.getSpikeVao(gl));
-            gl.drawArraysInstanced(gl.TRIANGLES, 0, templateVertexCount, markers.length);
-            this.applyProjection(gl, programs.dot, args, pickMode, viewportWidth, viewportHeight);
-            if (!pickMode) {
+            gl.uniform2f(uniforms.u_viewport, viewportWidth, viewportHeight);
+            gl.uniform1f(uniforms.u_dot_radius, (pickMode ? 6.5 : 5) * pixelScale);
+            if (pickMode) {
+              gl.disable(gl.BLEND);
+            } else {
               gl.enable(gl.BLEND);
               gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-              gl.depthMask(false);
             }
             gl.bindVertexArray(this.getDotVao(gl));
             gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, markers.length);
             gl.bindVertexArray(null);
             gl.disable(gl.BLEND);
-            gl.depthMask(true);
           },
 
           ensurePickTarget(gl) {
@@ -1152,7 +1041,6 @@ void main() {
             const height = Math.max(1, Math.floor(gl.drawingBufferHeight / PICK_DOWNSCALE));
             if (this.pickFramebuffer && this.pickWidth === width && this.pickHeight === height) return;
             if (this.pickTexture) gl.deleteTexture(this.pickTexture);
-            if (this.pickDepth) gl.deleteRenderbuffer(this.pickDepth);
             if (this.pickFramebuffer) gl.deleteFramebuffer(this.pickFramebuffer);
             this.pickWidth = width;
             this.pickHeight = height;
@@ -1162,14 +1050,9 @@ void main() {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
             gl.bindTexture(gl.TEXTURE_2D, null);
-            this.pickDepth = gl.createRenderbuffer();
-            gl.bindRenderbuffer(gl.RENDERBUFFER, this.pickDepth);
-            gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
-            gl.bindRenderbuffer(gl.RENDERBUFFER, null);
             this.pickFramebuffer = gl.createFramebuffer();
             gl.bindFramebuffer(gl.FRAMEBUFFER, this.pickFramebuffer);
             gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.pickTexture, 0);
-            gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.pickDepth);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
           },
 
@@ -1185,8 +1068,7 @@ void main() {
             gl.bindFramebuffer(gl.FRAMEBUFFER, this.pickFramebuffer);
             gl.viewport(0, 0, this.pickWidth, this.pickHeight);
             gl.clearColor(0, 0, 0, 0);
-            gl.clearDepth(1);
-            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.clear(gl.COLOR_BUFFER_BIT);
             this.drawScene(gl, entry, args, 1, this.pickWidth, this.pickHeight);
             const pixelX = Math.min(
               this.pickWidth - 1,
@@ -1206,11 +1088,8 @@ void main() {
           },
 
           render(gl, args) {
-            const entry = this.getPrograms(gl, args.shaderData);
-            gl.enable(gl.DEPTH_TEST);
-            gl.depthFunc(gl.LEQUAL);
-            gl.depthMask(true);
-            gl.disable(gl.BLEND);
+            const entry = this.getProgram(gl, args.shaderData);
+            gl.disable(gl.DEPTH_TEST);
             gl.disable(gl.CULL_FACE);
             this.drawScene(gl, entry, args, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
             if (this.pendingPick) this.resolvePick(gl, entry, args);
@@ -1227,7 +1106,7 @@ void main() {
           },
         };
       }
-      const spikeLayer = createSpikeLayer();
+      const markerLayer = createMarkerLayer();
       const map = new maplibregl.Map({
         container,
         center: [8, 35],
@@ -1267,7 +1146,7 @@ void main() {
       map.touchZoomRotate.disableRotation();
 
       await map.once('load');
-      map.addLayer(spikeLayer);
+      map.addLayer(markerLayer);
 
       const totalStations = markers.reduce((total, place) => total + (Number(place.size) || 0), 0);
       $('#globe-stats').textContent = `${markers.length.toLocaleString()} places · ${totalStations.toLocaleString()} stations`;
@@ -1312,7 +1191,7 @@ void main() {
 
       map.on('mousemove', (event) => {
         const point = event.point;
-        spikeLayer.pick(point, (place) => {
+        markerLayer.pick(point, (place) => {
           map.getCanvas().style.cursor = place ? 'pointer' : '';
           if (!place) {
             tooltip.classList.add('hidden');
@@ -1329,7 +1208,7 @@ void main() {
         tooltip.classList.add('hidden');
       });
       map.on('click', (event) => {
-        spikeLayer.pick(event.point, (place) => {
+        markerLayer.pick(event.point, (place) => {
           if (!place) return;
           showPlaceStations(place, stationsEl, 'Back to Globe', () => {
             stationsEl.classList.add('hidden');

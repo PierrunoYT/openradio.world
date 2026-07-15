@@ -8,6 +8,14 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Radio Garden-style green dot markers** — the pink 3D spikes are replaced
+  by the look the app was always chasing: flat, uniform, glowing green dots
+  hugging the satellite surface at a constant screen size, matching
+  radio.garden. The custom WebGL layer now draws a single instanced pass of
+  camera-facing dots at ground level (no prisms, no depth pass), keeping the
+  pixel-exact id-buffer picking. Verified in a headless browser: dots render
+  across the whole visible hemisphere and hovering one shows its place
+  tooltip.
 - **Working asymmetric wheel zoom** — the previous zoom-out fix replaced the
   whole wheel handler, but MapLibre's `easeTo` ignores anchor points under
   globe projection, so the cursor-anchored dive was silently lost. Zooming
