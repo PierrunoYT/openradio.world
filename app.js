@@ -923,6 +923,7 @@
 precision highp float;
 in vec2 v_corner;
 flat in vec3 v_pick;
+flat in float v_selected;
 uniform float u_pick_mode;
 out vec4 fragColor;
 void main() {
@@ -936,8 +937,14 @@ void main() {
     fragColor = vec4(v_pick, 1.0);
     return;
   }
-  float alpha = 1.0 - smoothstep(0.58, 1.0, dist);
-  vec3 color = mix(vec3(0.55, 1.0, 0.65), vec3(0.05, 0.78, 0.36), smoothstep(0.12, 0.85, dist));
+  // Selected quads are 2.4x larger. Keep their green center at the normal
+  // dot size and draw a crisp one-pixel light ring around it.
+  float coreDist = dist * mix(1.0, 2.4, v_selected);
+  float coreAlpha = 1.0 - smoothstep(0.58, 1.0, coreDist);
+  float ringAlpha = v_selected * (1.0 - smoothstep(0.025, 0.09, abs(dist - 0.78)));
+  float alpha = max(coreAlpha, ringAlpha);
+  vec3 dotColor = mix(vec3(0.55, 1.0, 0.65), vec3(0.05, 0.78, 0.36), smoothstep(0.12, 0.85, coreDist));
+  vec3 color = mix(dotColor, vec3(0.91, 0.94, 0.98), ringAlpha);
   fragColor = vec4(color * alpha, alpha);
 }`;
 
@@ -962,7 +969,7 @@ void main() {
           [
             'u_projection_matrix', 'u_projection_fallback_matrix', 'u_projection_tile_mercator_coords',
             'u_projection_clipping_plane', 'u_projection_transition', 'u_pick_mode', 'u_viewport',
-            'u_dot_radius',
+            'u_dot_radius', 'u_selected_pick',
           ].forEach((name) => { uniforms[name] = gl.getUniformLocation(program, name); });
           return { program, uniforms };
         }
@@ -973,6 +980,7 @@ void main() {
           renderingMode: '3d',
           programs: new Map(),
           pendingPick: null,
+          selectedPick: [0, 0, 0],
 
           onAdd(mapInstance, gl) {
             this.map = mapInstance;
@@ -1006,14 +1014,20 @@ in vec2 a_center;
 in vec3 a_pick;
 uniform vec2 u_viewport;
 uniform float u_dot_radius;
+uniform float u_pick_mode;
+uniform vec3 u_selected_pick;
 out vec2 v_corner;
 flat out vec3 v_pick;
+flat out float v_selected;
 void main() {
   vec4 anchor = projectTileFor3D(a_center, 0.0);
-  anchor.xy += a_corner * u_dot_radius * 2.0 * anchor.w / u_viewport;
+  float selected = 1.0 - step(0.001, distance(a_pick, u_selected_pick));
+  float selectionScale = mix(1.0, 2.4, selected * (1.0 - step(0.5, u_pick_mode)));
+  anchor.xy += a_corner * u_dot_radius * selectionScale * 2.0 * anchor.w / u_viewport;
   gl_Position = anchor;
   v_corner = a_corner;
   v_pick = a_pick;
+  v_selected = selected;
 }`;
             const entry = buildProgram(gl, dotVertexSource, dotFragmentSource, ['a_corner', 'a_center', 'a_pick']);
             this.programs.set(shaderData.variantName, entry);
@@ -1053,6 +1067,7 @@ void main() {
             gl.uniform1f(uniforms.u_pick_mode, pickMode);
             gl.uniform2f(uniforms.u_viewport, viewportWidth, viewportHeight);
             gl.uniform1f(uniforms.u_dot_radius, (pickMode ? 6.5 : 5) * pixelScale);
+            gl.uniform3f(uniforms.u_selected_pick, ...this.selectedPick);
             if (pickMode) {
               gl.disable(gl.BLEND);
               gl.disable(gl.DEPTH_TEST);
@@ -1148,6 +1163,15 @@ void main() {
             }
             if (this.map) this.map.triggerRepaint();
           },
+
+          select(place) {
+            const index = place ? markers.indexOf(place) : -1;
+            const id = index + 1;
+            this.selectedPick = id > 0
+              ? [(id & 255) / 255, ((id >> 8) & 255) / 255, ((id >> 16) & 255) / 255]
+              : [0, 0, 0];
+            if (this.map) this.map.triggerRepaint();
+          },
         };
       }
       const markerLayer = createMarkerLayer();
@@ -1208,35 +1232,9 @@ void main() {
       await map.once('load');
       map.addLayer(markerLayer);
 
-      // A separate MapLibre circle keeps the selected location unmistakable
-      // without changing the appearance or pick area of the WebGL dot layer.
-      const selectedPlaceSourceId = 'selected-place';
-      map.addSource(selectedPlaceSourceId, {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      });
-      map.addLayer({
-        id: 'selected-place-ring',
-        type: 'circle',
-        source: selectedPlaceSourceId,
-        paint: {
-          'circle-radius': 10,
-          'circle-color': 'rgba(0, 0, 0, 0)',
-          'circle-stroke-color': 'rgba(232, 238, 250, 0.95)',
-          'circle-stroke-width': 1.25,
-        },
-      });
-      const selectPlaceMarker = (place) => {
-        const features = place ? [{
-          type: 'Feature',
-          properties: {},
-          geometry: { type: 'Point', coordinates: place.geo },
-        }] : [];
-        map.getSource(selectedPlaceSourceId).setData({
-          type: 'FeatureCollection',
-          features,
-        });
-      };
+      // Render selection inside the same WebGL layer as the marker so the
+      // ring shares its exact globe projection, depth, and screen position.
+      const selectPlaceMarker = (place) => markerLayer.select(place);
 
       const totalStations = markers.reduce((total, place) => total + (Number(place.size) || 0), 0);
       $('#globe-stats').textContent = `${markers.length.toLocaleString()} places · ${totalStations.toLocaleString()} stations`;
