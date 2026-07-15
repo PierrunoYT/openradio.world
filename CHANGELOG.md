@@ -10,37 +10,34 @@ rather than by version number. Newest first.
 
 ### Changed
 
-- **Faster first globe open** — globe code and country geometry now warm in
-  browser idle time, the user sees a loading indicator when needed, and the
-  rendered country mesh uses a display-optimized copy with roughly 75% fewer
-  boundary vertices while retaining the full-resolution source data.
-- **Vector globe** — the globe now renders country shapes from Natural Earth
-  vector data (50m resolution) on a dark stylized sphere with an atmosphere
-  glow, instead of a satellite photo texture. Vector shapes stay razor sharp
-  at every zoom level, which fixed the pixelation when zooming in close.
-- **City points scale with zoom** — the 12,000+ city dots shrink as the
-  camera gets closer, so a zoomed-in view shows fine dots instead of fat
-  cylinders, with a size floor so they never vanish. The merged point
-  geometry rebuilds debounced to keep zooming smooth.
-- **Smoother interaction** — globe.gl's built-in pointer raycasting (which
-  tested the whole tessellated country geometry on every mouse move) is
-  disabled; hover and click are resolved with a single cheap ray-vs-sphere
-  test plus a nearest-city lookup. Render resolution is capped on very
-  high-DPI screens and the renderer requests the high-performance GPU.
-- **GPU rendering** — the globe runs on WebGL via a vendored copy of
-  [globe.gl](https://github.com/vasturiano/globe.gl) (MIT, three.js bundled,
-  loaded lazily the first time the view opens). This replaced two earlier
-  same-day iterations that rendered on the CPU 2D canvas (first city dots
-  only, then a per-pixel projected NASA texture) and stuttered while
-  dragging and zooming.
+- **Radio Garden-style place markers** — the complete directory of 12,326
+  places is represented by bright green, screen-space dots that stay crisp
+  and visible at every distance. Geographic level-of-detail clustering keeps
+  the world view readable and progressively reveals every place while
+  zooming; marker size reflects the number of nearby stations.
+- **Fast marker rendering** — city points moved from thousands of 3D
+  cylinders to one lightweight canvas pass over the WebGL earth. Only
+  front-facing markers are projected, globe.gl's expensive pointer raycasting
+  remains disabled, and hover/click use a sphere hit plus nearest-place lookup.
+- **Blue Marble globe** — the current earth uses locally served 4K NASA Blue
+  Marble imagery, a 2K topology bump map, and an atmosphere glow. This
+  supersedes the earlier same-day CPU-textured and Natural Earth vector
+  iterations while retaining smooth GPU interaction.
+- **Lower background cost** — render resolution is capped on high-DPI
+  screens, the high-performance GPU is requested, and the globe animation
+  pauses whenever another app view is open.
+- **Faster first and offline open** — globe code and textures warm during
+  browser idle time. If the live API is unavailable, the globe now loads only
+  the places snapshot instead of also parsing the 10 MB station catalog.
 
 ### Added
 
 - **Globe view** — an interactive 3D globe in the style of radio.garden as
   a new sidebar entry: drag to spin (with inertia), scroll or use the +/−
   buttons to zoom, hover a city for its name and station count, click a
-  city to list and play its stations. Featured cities render as larger
-  dots; the globe slowly rotates until touched.
+  city to list and play its stations. A live badge shows the loaded place and
+  station totals, featured cities render as larger dots, and the globe slowly
+  rotates until touched.
 
 ---
 
