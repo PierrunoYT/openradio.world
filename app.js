@@ -867,6 +867,34 @@
 
       const markers = places.filter((place) => Array.isArray(place.geo) && place.geo.length === 2);
       const byId = new Map(markers.map((place) => [place.id, place]));
+      const earthRadiusMeters = 6371008.8;
+      function markerColumnRing(place) {
+        const longitude = Number(place.geo[0]);
+        const latitude = Number(place.geo[1]);
+        const stationWeight = Math.log1p(Number(place.size) || 0);
+        const radiusMeters = 6500 + Math.min(4000, stationWeight * 650);
+        const angularRadius = radiusMeters / earthRadiusMeters;
+        const latitudeRadians = latitude * Math.PI / 180;
+        const longitudeRadians = longitude * Math.PI / 180;
+        const ring = [];
+
+        for (let side = 0; side <= 6; side += 1) {
+          const bearing = (side % 6) * Math.PI / 3;
+          const columnLatitude = Math.asin(
+            Math.sin(latitudeRadians) * Math.cos(angularRadius)
+            + Math.cos(latitudeRadians) * Math.sin(angularRadius) * Math.cos(bearing),
+          );
+          const columnLongitude = longitudeRadians + Math.atan2(
+            Math.sin(bearing) * Math.sin(angularRadius) * Math.cos(latitudeRadians),
+            Math.cos(angularRadius) - Math.sin(latitudeRadians) * Math.sin(columnLatitude),
+          );
+          let columnLongitudeDegrees = columnLongitude * 180 / Math.PI;
+          while (columnLongitudeDegrees - longitude > 180) columnLongitudeDegrees -= 360;
+          while (columnLongitudeDegrees - longitude < -180) columnLongitudeDegrees += 360;
+          ring.push([columnLongitudeDegrees, columnLatitude * 180 / Math.PI]);
+        }
+        return ring;
+      }
       const markerData = {
         type: 'FeatureCollection',
         features: markers.map((place) => ({
@@ -878,6 +906,18 @@
             boost: place.boost ? 1 : 0,
           },
           geometry: { type: 'Point', coordinates: place.geo },
+        })),
+      };
+      const markerColumnData = {
+        type: 'FeatureCollection',
+        features: markers.map((place) => ({
+          type: 'Feature',
+          id: place.id,
+          properties: {
+            id: place.id,
+            height: Math.round(28000 + Math.min(32000, Math.log1p(Number(place.size) || 0) * 5500)),
+          },
+          geometry: { type: 'Polygon', coordinates: [markerColumnRing(place)] },
         })),
       };
       const markerRadius = [
@@ -892,14 +932,13 @@
         5, ['+', 7.5, ['*', 0.5, ['ln', ['+', 1, ['get', 'size']]]]],
         12, ['+', 9, ['*', 0.575, ['ln', ['+', 1, ['get', 'size']]]]],
       ];
-      const markerSheenRadius = 2.2;
       const map = new maplibregl.Map({
         container,
         center: [8, 35],
         zoom: 1.15,
         minZoom: 0,
         maxZoom: 19,
-        pitch: 0,
+        pitch: 28,
         bearing: 0,
         attributionControl: false,
         doubleClickZoom: false,
@@ -921,10 +960,27 @@
               type: 'geojson',
               data: markerData,
             },
+            'place-columns': {
+              type: 'geojson',
+              data: markerColumnData,
+            },
           },
           layers: [
             { id: 'ocean', type: 'background', paint: { 'background-color': '#071a2c' } },
             { id: 'satellite', type: 'raster', source: 'satellite' },
+            {
+              id: 'place-columns',
+              type: 'fill-extrusion',
+              source: 'place-columns',
+              maxzoom: 7,
+              paint: {
+                'fill-extrusion-color': '#32e889',
+                'fill-extrusion-height': ['get', 'height'],
+                'fill-extrusion-base': 0,
+                'fill-extrusion-opacity': 0.92,
+                'fill-extrusion-vertical-gradient': true,
+              },
+            },
             {
               id: 'places-glow',
               type: 'circle',
@@ -937,20 +993,6 @@
               },
             },
             {
-              id: 'places-depth',
-              type: 'circle',
-              source: 'places',
-              paint: {
-                'circle-color': '#08704a',
-                'circle-stroke-color': '#03482f',
-                'circle-stroke-width': 1,
-                'circle-radius': markerRadius,
-                'circle-translate': [0, 2.25],
-                'circle-translate-anchor': 'viewport',
-                'circle-opacity': 0.98,
-              },
-            },
-            {
               id: 'places',
               type: 'circle',
               source: 'places',
@@ -960,19 +1002,6 @@
                 'circle-stroke-width': 1.5,
                 'circle-radius': markerRadius,
                 'circle-opacity': 1,
-              },
-            },
-            {
-              id: 'places-sheen',
-              type: 'circle',
-              source: 'places',
-              paint: {
-                'circle-color': '#eafff1',
-                'circle-radius': markerSheenRadius,
-                'circle-translate': [-0.8, -0.8],
-                'circle-translate-anchor': 'viewport',
-                'circle-opacity': 0.34,
-                'circle-blur': 0.45,
               },
             },
           ],

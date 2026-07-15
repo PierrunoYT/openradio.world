@@ -32,9 +32,10 @@ rather than by version number. Newest first.
 - **High-visibility place markers** — all 12,326 places are rendered in native
   MapLibre GeoJSON circle layers with compact station-weighted sizes, a bright
   outline, and a soft glow that remains legible over satellite imagery.
-- **Raised marker tiles** — a dark viewport-aligned side and inset sheen give
-  each compact place marker a subtle puck-like height without changing its
-  top size or making it grow disproportionately while zooming.
+- **Extruded marker columns** — every place now has a real hexagonal MapLibre
+  fill extrusion rising above the globe, with shaded walls and station-weighted
+  height. A modest camera tilt exposes the vertical geometry, while compact
+  circles remain at ground level for precise interaction.
 - **Forgiving marker interaction** — rendered-feature picking uses a 12-pixel
   tolerance around the pointer, making even small and densely packed places
   easier to hover and select while remaining aligned with the globe.
@@ -58,9 +59,9 @@ rather than by version number. Newest first.
 - **Globe-only marker picking** — hover and click candidates must be on the
   visible hemisphere and within 12 screen pixels of their exact projected
   coordinates, preventing location tooltips from appearing outside the globe.
-- **Valid cached marker style** — the marker sheen now uses a fixed radius with
-  no camera expression, and the application script URL is versioned so cached
-  copies of the invalid nested zoom expression are not reused after deployment.
+- **Versioned marker style assets** — the application script URL is versioned
+  so cached copies of an older invalid marker expression are not reused after
+  a globe deployment.
 - **Smaller place circles** — marker and glow radii are half their previous
   size, reducing overlap without shrinking their forgiving interaction area.
 - **Stable station loading** — station data now loads before the results panel
