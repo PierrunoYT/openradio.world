@@ -8,6 +8,8 @@ No accounts, no ads, no tracking. Just open and listen.
 ![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
 ![Build](https://img.shields.io/badge/build-none_needed-brightgreen.svg)
 
+**GitHub:** [https://github.com/PierrunoYT/openradio.world](https://github.com/PierrunoYT/openradio.world)
+
 ![OpenRadio Screenshot](assets/Screenshot%202026-02-07%20at%2013-20-47%20OpenRadio%20-%20Worldwide%20Internet%20Radio.png)
 
 ---
@@ -37,6 +39,8 @@ No accounts, no ads, no tracking. Just open and listen.
 3. Start listening
 
 ```bash
+git clone https://github.com/PierrunoYT/openradio.world.git
+cd openradio.world
 # Open index.html in your browser
 start index.html        # Windows
 open index.html         # macOS
