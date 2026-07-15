@@ -8,6 +8,23 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Custom WebGL spike layer** — the station spikes are no longer MapLibre
+  fill-extrusions: a custom layer draws all 12,326 octagonal spikes in a
+  single instanced WebGL call inside MapLibre's render loop, using MapLibre's
+  injected projection shader so they sit correctly on the globe, survive the
+  globe-to-mercator transition at deep zoom, and clip behind the horizon.
+  Spikes gain per-wall lighting and a brightened tip, and the map canvas is
+  antialiased.
+- **Pixel-exact marker picking** — hovering or clicking renders spike ids
+  into an offscreen buffer and reads the pixel under the pointer, so the hit
+  area is exactly the spike's visible body at any zoom, with correct
+  front-to-back ordering, replacing the earlier screen-space approximation.
+- **Thicker, high-visibility spikes** — footprints widened to 2.6–4.6 km and
+  the color switched from muted green to hot pink at full opacity, a hue
+  nothing in the satellite imagery competes with.
+- **Full-body column clicks** — clicks anywhere along a column's projected
+  screen segment selected its place, working around MapLibre only
+  hit-testing the ground footprint of fill-extrusions.
 - **Spike station markers** — all 12,326 places are rendered as thin octagonal
   MapLibre fill-extrusion spikes with station-weighted heights of 160–400 km,
   tall enough to read at the initial world view without zooming in. The spikes
