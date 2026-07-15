@@ -57,6 +57,9 @@ rather than by version number. Newest first.
 - **Smooth station loading** — selecting a place now paints a dedicated loading
   panel before scrolling, then crossfades the completed station grid into view
   instead of replacing the globe results abruptly.
+- **Polished imagery credit** — the Esri attribution now uses a compact glass
+  pill with clean spacing and responsive sizing instead of an overlapping info
+  toggle and text box.
 
 ### Added
 

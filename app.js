@@ -953,7 +953,7 @@
           },
         },
       });
-      map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
+      map.addControl(new maplibregl.AttributionControl({ compact: false }), 'bottom-left');
       map.touchZoomRotate.disableRotation();
 
       await map.once('load');
