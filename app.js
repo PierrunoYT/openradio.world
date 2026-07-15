@@ -301,351 +301,129 @@
   }
 
   // ===== Globe View =====
-  // A dependency-free 3D globe: the ~12k city dots themselves draw the
-  // continents (orthographic projection on a 2D canvas, like Radio Garden).
+  // WebGL globe (globe.gl, vendored in lib/) wrapped in NASA Blue Marble
+  // imagery. The library is loaded lazily the first time the view opens.
   let globeInited = false;
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error(`Failed to load ${src}`));
+      document.head.appendChild(s);
+    });
+  }
 
   async function loadGlobe() {
     if (globeInited) return;
     globeInited = true;
 
     const wrap = $('#globe-wrap');
-    const canvas = $('#globe-canvas');
+    const container = $('#globe-3d');
     const tooltip = $('#globe-tooltip');
     const stationsEl = $('#globe-stations');
-    const ctx = canvas.getContext('2d');
 
-    let pts = [];
+    let pts;
     try {
-      const places = await getPlaces();
+      const [places] = await Promise.all([getPlaces(), loadScript('lib/globe.gl.min.js')]);
       pts = places.filter((p) => Array.isArray(p.geo) && p.geo.length === 2);
     } catch (err) {
       console.error('Failed to load globe:', err);
-      wrap.innerHTML = '<div class="empty-state"><p>Failed to load the globe. Please refresh.</p></div>';
+      globeInited = false;
+      container.innerHTML = '<div class="empty-state"><p>Failed to load the globe. Please refresh.</p></div>';
       return;
     }
 
-    // Precompute each place's trigonometry once
-    const n = pts.length;
-    const D2R = Math.PI / 180;
-    const sinLat = new Float32Array(n);
-    const cosLat = new Float32Array(n);
-    const sinLng = new Float32Array(n);
-    const cosLng = new Float32Array(n);
-    // Projected screen position + depth, refreshed every render (for hit testing)
-    const sx = new Float32Array(n);
-    const sy = new Float32Array(n);
-    const depth = new Float32Array(n);
+    const globe = Globe()(container)
+      .width(wrap.clientWidth)
+      .height(wrap.clientHeight)
+      .backgroundColor('rgba(0,0,0,0)')
+      .globeImageUrl('assets/earth.jpg')
+      .showAtmosphere(true)
+      .atmosphereColor('#a29bfe')
+      .atmosphereAltitude(0.15)
+      .pointsMerge(true)
+      .pointsData(pts)
+      .pointLat((p) => p.geo[1])
+      .pointLng((p) => p.geo[0])
+      .pointColor((p) => (p.boost ? '#e9d5ff' : '#a29bfe'))
+      .pointAltitude(0.004)
+      .pointRadius((p) => (p.boost ? 0.2 : p.size > 40 ? 0.14 : 0.09))
+      .onGlobeClick(({ lat, lng }) => {
+        const hit = nearestPlace(lat, lng);
+        if (hit) {
+          showPlaceStations(hit, stationsEl, 'Back to Globe', () => {
+            stationsEl.classList.add('hidden');
+          });
+          stationsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
 
-    pts.forEach((p, i) => {
-      const lng = p.geo[0] * D2R;
-      const lat = p.geo[1] * D2R;
-      sinLat[i] = Math.sin(lat);
-      cosLat[i] = Math.cos(lat);
-      sinLng[i] = Math.sin(lng);
-      cosLng[i] = Math.cos(lng);
+    globe.pointOfView({ lat: 45, lng: 10, altitude: 2 }, 0);
+
+    const controls = globe.controls();
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.4;
+    controls.minDistance = 115; // globe radius is 100 units
+    controls.maxDistance = 480;
+    controls.addEventListener('start', () => {
+      controls.autoRotate = false;
     });
 
-    // View state: centered on Europe to start
-    let lng0 = 10 * D2R;
-    let lat0 = 40 * D2R;
-    let zoom = 1;
-    let autoRotate = true;
-    let dirty = true;
-    let hovered = -1;
-    let dpr = 1;
-    let W = 0;
-    let H = 0;
-
-    function resize() {
-      dpr = window.devicePixelRatio || 1;
-      W = wrap.clientWidth;
-      H = wrap.clientHeight;
-      canvas.width = Math.round(W * dpr);
-      canvas.height = Math.round(H * dpr);
-      dirty = true;
-    }
-    resize();
-    new ResizeObserver(resize).observe(wrap);
-
-    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent-light').trim() || '#a78bfa';
-
-    // Earth texture (NASA Blue Marble, equirectangular). Wrapped onto the
-    // sphere by per-pixel inverse projection; until it loads (or if it
-    // fails) the globe falls back to a shaded sphere with only the dots.
-    let texData = null;
-    let texW = 0;
-    let texH = 0;
-    const texImg = new Image();
-    texImg.onload = () => {
-      texW = 2048;
-      texH = 1024;
-      const tc = document.createElement('canvas');
-      tc.width = texW;
-      tc.height = texH;
-      const tctx = tc.getContext('2d');
-      tctx.drawImage(texImg, 0, 0, texW, texH);
-      texData = tctx.getImageData(0, 0, texW, texH).data;
-      dirty = true;
-    };
-    texImg.src = 'assets/earth.jpg';
-
-    const sphereCanvas = document.createElement('canvas');
-    const sphereCtx = sphereCanvas.getContext('2d');
-
-    function drawTexturedSphere(cx, cy, R) {
-      // Lower sampling resolution while moving, full quality at rest
-      const quality = dragging ? 0.45 : autoRotate ? 0.55 : 1;
-      const size = Math.ceil(2 * R);
-      const rw = Math.max(2, Math.round(size * quality));
-      if (sphereCanvas.width !== rw) {
-        sphereCanvas.width = rw;
-        sphereCanvas.height = rw;
-      }
-
-      const img = sphereCtx.createImageData(rw, rw);
-      const d = img.data;
-      const Rr = rw / 2;
-      const sinLat0 = Math.sin(lat0);
-      const cosLat0 = Math.cos(lat0);
-      const TWO_PI = Math.PI * 2;
-      const edge = 1 - 2.5 / Rr; // start of antialiased rim
-
-      let k = 0;
-      for (let j = 0; j < rw; j++) {
-        const y = (Rr - j - 0.5) / Rr;
-        for (let i = 0; i < rw; i++, k += 4) {
-          const x = (i + 0.5 - Rr) / Rr;
-          const r2 = x * x + y * y;
-          if (r2 > 1) continue; // outside the disc: stays transparent
-
-          const zv = Math.sqrt(1 - r2);
-          // Inverse orthographic: screen vector -> lat/lng
-          const sLat = y * cosLat0 + zv * sinLat0;
-          const lat = Math.asin(sLat > 1 ? 1 : sLat < -1 ? -1 : sLat);
-          const lng = lng0 + Math.atan2(x, zv * cosLat0 - y * sinLat0);
-
-          let u = lng / TWO_PI + 0.5;
-          u -= Math.floor(u);
-          const tx = (u * texW) | 0;
-          let ty = ((0.5 - lat / Math.PI) * texH) | 0;
-          if (ty >= texH) ty = texH - 1;
-          const ti = (ty * texW + tx) * 4;
-
-          const shade = 0.45 + 0.55 * zv; // day-side style shading
-          d[k] = texData[ti] * shade;
-          d[k + 1] = texData[ti + 1] * shade;
-          d[k + 2] = texData[ti + 2] * shade;
-
-          const r = Math.sqrt(r2);
-          d[k + 3] = r > edge ? 255 * ((1 - r) / (1 - edge)) : 255;
-        }
-      }
-
-      sphereCtx.putImageData(img, 0, 0);
-      ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(sphereCanvas, cx - size / 2, cy - size / 2, size, size);
-    }
-
-    function render() {
-      const cx = (W / 2) * dpr;
-      const cy = (H / 2) * dpr;
-      const R = Math.min(W, H) * 0.44 * zoom * dpr;
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      if (texData) {
-        drawTexturedSphere(cx, cy, R);
-      } else {
-        // Fallback: shaded sphere (texture not loaded yet or unavailable)
-        const grad = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
-        grad.addColorStop(0, 'rgba(120, 100, 200, 0.22)');
-        grad.addColorStop(0.7, 'rgba(60, 50, 110, 0.16)');
-        grad.addColorStop(1, 'rgba(30, 25, 60, 0.3)');
-        ctx.beginPath();
-        ctx.arc(cx, cy, R, 0, Math.PI * 2);
-        ctx.fillStyle = grad;
-        ctx.fill();
-      }
-
-      ctx.beginPath();
-      ctx.arc(cx, cy, R, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(167, 139, 250, 0.35)';
-      ctx.lineWidth = 1.5 * dpr;
-      ctx.stroke();
-
-      // Orthographic projection centered on (lat0, lng0)
-      const sinLat0 = Math.sin(lat0);
-      const cosLat0 = Math.cos(lat0);
-      const sinLng0 = Math.sin(lng0);
-      const cosLng0 = Math.cos(lng0);
-
-      ctx.fillStyle = accent;
-      for (let i = 0; i < n; i++) {
-        // cos/sin of (lng - lng0) via angle-difference identities
-        const cosDl = cosLng[i] * cosLng0 + sinLng[i] * sinLng0;
-        const sinDl = sinLng[i] * cosLng0 - cosLng[i] * sinLng0;
-        const z = sinLat0 * sinLat[i] + cosLat0 * cosLat[i] * cosDl;
-
-        if (z <= 0) {
-          depth[i] = -1;
-          sx[i] = -1e5;
-          continue;
-        }
-
-        const x = cosLat[i] * sinDl;
-        const y = cosLat0 * sinLat[i] - sinLat0 * cosLat[i] * cosDl;
-
-        const X = cx + x * R;
-        const Y = cy - y * R;
-        sx[i] = X;
-        sy[i] = Y;
-        depth[i] = z;
-
-        const boost = pts[i].boost;
-        const s = (boost ? 2.6 : pts[i].size > 40 ? 1.9 : 1.3) * dpr * Math.min(zoom, 2.2);
-        ctx.globalAlpha = 0.25 + 0.75 * z;
-        ctx.fillRect(X - s / 2, Y - s / 2, s, s);
-      }
-      ctx.globalAlpha = 1;
-
-      // Hovered city marker
-      if (hovered >= 0 && depth[hovered] > 0) {
-        ctx.beginPath();
-        ctx.arc(sx[hovered], sy[hovered], 5 * dpr, 0, Math.PI * 2);
-        ctx.fillStyle = '#fff';
-        ctx.fill();
-        ctx.strokeStyle = accent;
-        ctx.lineWidth = 2 * dpr;
-        ctx.stroke();
-      }
-    }
-
-    function frame() {
-      if (autoRotate) {
-        lng0 += 0.0006;
-        dirty = true;
-      }
-      if (dirty) {
-        dirty = false;
-        render();
-      }
-      requestAnimationFrame(frame);
-    }
-    requestAnimationFrame(frame);
-
-    // Nearest visible dot within grab distance of a canvas-space point
-    function hitTest(clientX, clientY) {
-      const rect = canvas.getBoundingClientRect();
-      const mx = (clientX - rect.left) * dpr;
-      const my = (clientY - rect.top) * dpr;
-      const maxDist = 10 * dpr;
-      let best = -1;
-      let bestD = maxDist * maxDist;
-      for (let i = 0; i < n; i++) {
-        if (depth[i] <= 0) continue;
-        const dx = sx[i] - mx;
-        const dy = sy[i] - my;
-        const d = dx * dx + dy * dy;
+    // Nearest place to a lat/lng, accepted within a zoom-scaled radius
+    const D2R = Math.PI / 180;
+    function nearestPlace(lat, lng) {
+      const cosLat = Math.cos(lat * D2R);
+      let best = null;
+      let bestD = Infinity;
+      for (const p of pts) {
+        const dLat = (p.geo[1] - lat) * D2R;
+        let dLng = (p.geo[0] - lng) * D2R;
+        if (dLng > Math.PI) dLng -= 2 * Math.PI;
+        else if (dLng < -Math.PI) dLng += 2 * Math.PI;
+        const x = cosLat * dLng;
+        const d = dLat * dLat + x * x;
         if (d < bestD) {
           bestD = d;
-          best = i;
+          best = p;
         }
       }
-      return best;
+      const alt = globe.pointOfView().altitude;
+      const maxRad = 0.012 + 0.02 * alt;
+      return bestD < maxRad * maxRad ? best : null;
     }
 
-    // Drag to rotate, click to open a city
-    let dragging = false;
-    let moved = 0;
-    let lastX = 0;
-    let lastY = 0;
-
-    canvas.addEventListener('pointerdown', (e) => {
-      dragging = true;
-      moved = 0;
-      autoRotate = false;
-      hovered = -1;
-      tooltip.classList.add('hidden');
-      lastX = e.clientX;
-      lastY = e.clientY;
-      canvas.setPointerCapture(e.pointerId);
-      canvas.style.cursor = 'grabbing';
-    });
-
-    canvas.addEventListener('pointermove', (e) => {
-      if (dragging) {
-        const dx = e.clientX - lastX;
-        const dy = e.clientY - lastY;
-        moved += Math.abs(dx) + Math.abs(dy);
-        lastX = e.clientX;
-        lastY = e.clientY;
-        const k = 0.005 / zoom;
-        lng0 -= dx * k;
-        lat0 += dy * k;
-        lat0 = Math.max(-1.45, Math.min(1.45, lat0));
-        dirty = true;
-        return;
-      }
-
-      const hit = hitTest(e.clientX, e.clientY);
-      if (hit !== hovered) {
-        hovered = hit;
-        dirty = true;
-      }
-      canvas.style.cursor = hit >= 0 ? 'pointer' : 'grab';
-
-      if (hit >= 0) {
-        const p = pts[hit];
-        tooltip.textContent = `${p.title}, ${p.country} · ${p.size} station${p.size === 1 ? '' : 's'}`;
-        const rect = wrap.getBoundingClientRect();
-        tooltip.style.left = `${e.clientX - rect.left + 14}px`;
-        tooltip.style.top = `${e.clientY - rect.top - 10}px`;
+    // Hover tooltip
+    container.addEventListener('pointermove', (e) => {
+      const rect = container.getBoundingClientRect();
+      const coords = globe.toGlobeCoords(e.clientX - rect.left, e.clientY - rect.top);
+      const hit = coords && nearestPlace(coords.lat, coords.lng);
+      if (hit) {
+        tooltip.textContent = `${hit.title}, ${hit.country} · ${hit.size} station${hit.size === 1 ? '' : 's'}`;
+        const wrect = wrap.getBoundingClientRect();
+        tooltip.style.left = `${e.clientX - wrect.left + 14}px`;
+        tooltip.style.top = `${e.clientY - wrect.top - 10}px`;
         tooltip.classList.remove('hidden');
       } else {
         tooltip.classList.add('hidden');
       }
     });
 
-    canvas.addEventListener('pointerup', (e) => {
-      dragging = false;
-      dirty = true; // re-render at full quality
-      canvas.style.cursor = 'grab';
-      if (moved < 5) {
-        const hit = hitTest(e.clientX, e.clientY);
-        if (hit >= 0) {
-          const p = pts[hit];
-          showPlaceStations(p, stationsEl, 'Back to Globe', () => {
-            stationsEl.classList.add('hidden');
-          });
-          stationsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }
-    });
+    container.addEventListener('pointerleave', () => tooltip.classList.add('hidden'));
+    container.addEventListener('pointerdown', () => tooltip.classList.add('hidden'));
 
-    canvas.addEventListener('pointerleave', () => {
-      hovered = -1;
-      tooltip.classList.add('hidden');
-      dirty = true;
-    });
+    new ResizeObserver(() => {
+      globe.width(wrap.clientWidth).height(wrap.clientHeight);
+    }).observe(wrap);
 
-    function setZoom(z) {
-      zoom = Math.max(0.8, Math.min(10, z));
-      dirty = true;
+    // Zoom buttons (wheel/pinch zoom is built into the controls)
+    function zoomBy(factor) {
+      const pov = globe.pointOfView();
+      globe.pointOfView({ altitude: Math.max(0.15, Math.min(3.8, pov.altitude * factor)) }, 300);
     }
-
-    canvas.addEventListener(
-      'wheel',
-      (e) => {
-        e.preventDefault();
-        autoRotate = false;
-        setZoom(zoom * Math.exp(-e.deltaY * 0.0012));
-      },
-      { passive: false }
-    );
-
-    $('#globe-zoom-in').addEventListener('click', () => setZoom(zoom * 1.4));
-    $('#globe-zoom-out').addEventListener('click', () => setZoom(zoom / 1.4));
+    $('#globe-zoom-in').addEventListener('click', () => zoomBy(0.65));
+    $('#globe-zoom-out').addEventListener('click', () => zoomBy(1 / 0.65));
   }
 
   // ===== Search =====

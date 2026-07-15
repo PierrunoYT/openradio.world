@@ -5,7 +5,7 @@
 No accounts, no ads, no tracking. Just open and listen.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
+![Dependencies](https://img.shields.io/badge/dependencies-1_(vendored)-brightgreen.svg)
 ![Build](https://img.shields.io/badge/build-none_needed-brightgreen.svg)
 
 **GitHub:** [https://github.com/PierrunoYT/openradio.world](https://github.com/PierrunoYT/openradio.world)
@@ -18,7 +18,7 @@ No accounts, no ads, no tracking. Just open and listen.
 
 - **Thousands of stations in 12,000+ cities** worldwide via the [Radio Garden](https://radio.garden/) API
 - **Discover** — Stations from a rotating selection of featured cities around the globe
-- **Globe** — An interactive 3D globe with real satellite imagery (NASA Blue Marble); spin, zoom, and click a city to tune in
+- **Globe** — A WebGL 3D globe with real satellite imagery (NASA Blue Marble); spin, zoom, and click a city to tune in
 - **Search** — Real-time search by station name or place
 - **Browse by Country** — Drill down from country to city to stations
 - **Browse by City** — Every city on the Radio Garden globe, sorted by station count
@@ -28,7 +28,7 @@ No accounts, no ads, no tracking. Just open and listen.
 - **Keyboard Shortcuts** — Navigate and control playback without touching the mouse
 - **Responsive Design** — Works on desktop, tablet, and mobile
 - **Dark Theme** — Modern dark UI with purple accents and animated equalizer
-- **Zero Dependencies** — Pure HTML, CSS, and JavaScript. No frameworks, no build step
+- **No Build Step** — Plain HTML, CSS, and JavaScript; the only dependency is a vendored copy of [globe.gl](https://github.com/vasturiano/globe.gl) for the 3D globe, loaded lazily
 - **Stream Retry Logic** — Automatic retries when a stream fails to start
 
 ## Getting Started
@@ -98,6 +98,7 @@ OpenRadio/
 - **CSS Custom Properties** for theming
 - **Media Session API** for OS-level media controls
 - **localStorage** for favorites and preferences
+- **globe.gl** (vendored, MIT) — WebGL globe rendering with NASA Blue Marble imagery
 - **Vanilla JavaScript** — no frameworks, no transpilers, no bundlers
 
 ## API

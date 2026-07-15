@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.2.0] - 2026-07-15
+
+### Changed
+
+- **Globe is now GPU-rendered** via a vendored copy of globe.gl (MIT, three.js-based, loaded lazily when the view opens), replacing the CPU canvas renderer — smooth dragging and zooming with inertia, always sharp, with an atmosphere glow. City dots are merged into a single geometry for performance; clicks resolve to the nearest city with a zoom-aware radius.
+
+---
+
 ## [1.1.0] - 2026-07-15
 
 ### Added
