@@ -1161,7 +1161,6 @@ void main() {
           },
         },
       });
-      map.addControl(new maplibregl.AttributionControl({ compact: false }), 'bottom-left');
       map.touchZoomRotate.disableRotation();
 
       await map.once('load');

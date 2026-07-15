@@ -8,6 +8,8 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Removed the imagery credit pill** — the Esri attribution control no
+  longer overlays the globe's bottom-left corner.
 - **Solid globe again** — the green dots briefly rendered without depth
   testing, so far-side cities showed through the planet and drifted like a
   floating layer while zooming. Dots are depth-tested against the globe
