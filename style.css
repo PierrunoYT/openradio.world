@@ -1122,6 +1122,7 @@ input[type="text"] {
 
 #globe-stations {
   margin-top: 20px;
+  padding-bottom: 24px;
 }
 
 @media (max-width: 640px) {

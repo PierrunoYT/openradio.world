@@ -65,6 +65,8 @@ rather than by version number. Newest first.
 - **Natural single-station cards** — the completed results grid no longer
   inherits the loading panel's height, so a lone station keeps normal card
   proportions instead of stretching into a large block.
+- **Results bottom spacing** — the globe station panel now leaves breathing
+  room below its final card instead of ending flush against the scroll edge.
 
 ### Added
 
