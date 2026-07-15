@@ -62,6 +62,9 @@ rather than by version number. Newest first.
   toggle and text box.
 - **Stable globe viewport** — opening station results no longer shrinks or
   resizes the map; result cards flow below its fixed desktop or mobile height.
+- **Natural single-station cards** — the completed results grid no longer
+  inherits the loading panel's height, so a lone station keeps normal card
+  proportions instead of stretching into a large block.
 
 ### Added
 
