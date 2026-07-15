@@ -8,6 +8,11 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Globe opens big, like Radio Garden** — the globe view no longer starts
+  as a small distant marble. The starting zoom is now computed from the
+  container size so the planet spans about 95% of the shorter edge of the
+  view on any screen, matching Radio Garden's opening framing (never
+  zoomed out further than before on small screens).
 - **GitHub link in the sidebar** — OpenRadio is open source, and the site
   now says so: the sidebar footer links to the project repository at
   [github.com/PierrunoYT/openradio.world](https://github.com/PierrunoYT/openradio.world),

@@ -1151,10 +1151,21 @@ void main() {
         };
       }
       const markerLayer = createMarkerLayer();
+      // Open on a big globe like Radio Garden instead of a distant marble:
+      // pick the zoom where the globe spans ~95% of the shorter container
+      // edge. Under globe projection the globe's pixel radius is
+      // worldSize / (2π · cos(centerLat)) with worldSize = 512 · 2^zoom.
+      const GLOBE_CENTER_LAT = 35;
+      const fitDiameter =
+        0.95 * Math.min(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
+      const initialZoom = Math.max(
+        1.15,
+        Math.log2((fitDiameter * Math.PI * Math.cos((GLOBE_CENTER_LAT * Math.PI) / 180)) / 512),
+      );
       const map = new maplibregl.Map({
         container,
-        center: [8, 35],
-        zoom: 1.15,
+        center: [8, GLOBE_CENTER_LAT],
+        zoom: initialZoom,
         minZoom: 0,
         maxZoom: 19,
         pitch: 20,
