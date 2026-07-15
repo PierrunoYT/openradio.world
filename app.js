@@ -29,6 +29,7 @@
   let searchTimeout = null;
   let placesCache = null;
   let placesPromise = null;
+  let refreshGlobeMarkers = null;
 
   // ===== DOM References =====
   const $ = (sel) => document.querySelector(sel);
@@ -93,18 +94,43 @@
   // If the live API is unreachable (e.g. locked down), we serve from it.
   let snapshot = null; // { places, stations, byPlace: Map<placeId, station[]> }
   let snapshotPromise = null;
+  let snapshotPlaces = null;
+  let snapshotPlacesPromise = null;
   let snapshotNotified = false;
+
+  // Places are enough for the globe and browse views. Keep them separate from
+  // the 10 MB station snapshot so opening the globe offline stays lightweight.
+  async function loadSnapshotPlaces() {
+    if (snapshot && snapshot.places) return snapshot.places;
+    if (snapshotPlaces) return snapshotPlaces;
+    if (!snapshotPlacesPromise) {
+      snapshotPlacesPromise = fetch('data/places.json')
+        .then((res) => {
+          if (!res.ok) throw new Error('No local places snapshot available');
+          return res.json();
+        })
+        .then((places) => {
+          snapshotPlaces = places;
+          return places;
+        })
+        .catch((err) => {
+          snapshotPlacesPromise = null;
+          throw err;
+        });
+    }
+    return snapshotPlacesPromise;
+  }
 
   async function loadSnapshot() {
     if (snapshot) return snapshot;
     if (!snapshotPromise) {
       snapshotPromise = (async () => {
-        const [placesRes, stationsRes] = await Promise.all([
-          fetch('data/places.json'),
+        const [places, stationsRes] = await Promise.all([
+          loadSnapshotPlaces(),
           fetch('data/stations.json'),
         ]);
-        if (!placesRes.ok || !stationsRes.ok) throw new Error('No local snapshot available');
-        const [places, stations] = await Promise.all([placesRes.json(), stationsRes.json()]);
+        if (!stationsRes.ok) throw new Error('No local stations snapshot available');
+        const stations = await stationsRes.json();
 
         const byPlace = new Map();
         stations.forEach((s) => {
@@ -135,7 +161,7 @@
           placesCache = data.data.list.filter((p) => p.title && p.country);
         } catch (err) {
           console.warn('Places API failed, trying local snapshot:', err.message);
-          placesCache = (await loadSnapshot()).places;
+          placesCache = await loadSnapshotPlaces();
         }
         return placesCache;
       })().catch((err) => {
@@ -244,6 +270,13 @@
     currentView = view;
     const config = views[view];
 
+    // globe.gl otherwise keeps its render loop alive underneath every view.
+    // Pause it whenever the globe is not visible.
+    if (window.__globe) {
+      if (view === 'globe') window.__globe.resumeAnimation();
+      else window.__globe.pauseAnimation();
+    }
+
     $$('.nav-btn').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.view === view);
     });
@@ -331,11 +364,13 @@
   }
 
   // ===== Globe View =====
-  // WebGL globe (globe.gl, vendored in lib/) wrapped in NASA Blue Marble
-  // imagery. Static rendering assets are warmed during browser idle time.
+  // WebGL globe (globe.gl, vendored in lib/) with a local 4K NASA Blue
+  // Marble texture. Static rendering assets are warmed during browser idle.
+  const GLOBE_TEXTURE = 'assets/earth-blue-marble.jpg';
+  const GLOBE_BUMP_MAP = 'assets/earth-topology.png';
   let globeInited = false;
   let globeLibraryPromise = null;
-  let globeCountriesPromise = null;
+  let globeTexturePromise = null;
 
   function loadScript(src) {
     return new Promise((resolve, reject) => {
@@ -358,27 +393,35 @@
     return globeLibraryPromise;
   }
 
-  function loadGlobeCountries() {
-    if (!globeCountriesPromise) {
-      globeCountriesPromise = fetch('data/countries-lite.geojson')
-        .then((res) => {
-          if (!res.ok) throw new Error(`Failed to load country geometry: ${res.status}`);
-          return res.json();
-        })
-        .catch((err) => {
-          globeCountriesPromise = null;
-          throw err;
-        });
+  function loadGlobeTextures() {
+    if (!globeTexturePromise) {
+      globeTexturePromise = Promise.all(
+        [GLOBE_TEXTURE, GLOBE_BUMP_MAP].map(
+          (src) => new Promise((resolve, reject) => {
+            const image = new Image();
+            image.onload = resolve;
+            image.onerror = () => reject(new Error(`Failed to load ${src}`));
+            image.src = src;
+          }),
+        ),
+      ).catch((err) => {
+        globeTexturePromise = null;
+        throw err;
+      });
     }
-    return globeCountriesPromise;
+    return globeTexturePromise;
   }
 
   function prepareGlobeAssets() {
-    return Promise.all([loadGlobeLibrary(), loadGlobeCountries()]);
+    return Promise.all([loadGlobeLibrary(), loadGlobeTextures()]);
   }
 
   async function loadGlobe() {
-    if (globeInited) return;
+    if (globeInited) {
+      if (window.__globe) window.__globe.resumeAnimation();
+      if (refreshGlobeMarkers) refreshGlobeMarkers();
+      return;
+    }
     globeInited = true;
 
     const wrap = $('#globe-wrap');
@@ -390,15 +433,13 @@
     container.innerHTML = '<div class="loader" aria-label="Loading globe"></div>';
 
     let pts;
-    let countries;
     try {
-      const [places, , countryData] = await Promise.all([
+      const [places] = await Promise.all([
         getPlaces(),
         loadGlobeLibrary(),
-        loadGlobeCountries(),
+        loadGlobeTextures(),
       ]);
       pts = places.filter((p) => Array.isArray(p.geo) && p.geo.length === 2);
-      countries = countryData;
     } catch (err) {
       console.error('Failed to load globe:', err);
       globeInited = false;
@@ -410,15 +451,16 @@
     container.classList.remove('loading-placeholder');
     container.innerHTML = '';
 
-    const initialWidth = Math.max(1, Math.round(wrap.clientWidth));
-    const initialHeight = Math.max(1, Math.round(wrap.clientHeight));
-    const pointRadius = (p) => (p.boost ? 0.18 : p.size > 40 ? 0.13 : 0.085);
+    const initialRect = container.getBoundingClientRect();
+    const initialWidth = Math.max(1, Math.floor(initialRect.width));
+    const initialHeight = Math.max(1, Math.floor(initialRect.height));
 
-    // Keep every rendered layer at a distinct depth. Very small offsets cause
-    // the globe and country caps to compete in the depth buffer while moving.
+    // Keep the earth itself on the GPU. City markers are rendered by one 2D
+    // canvas pass below; generating 12,000 individual cylinders is both slower
+    // and makes their apparent size depend on camera distance.
     const globe = Globe({
       rendererConfig: {
-        antialias: true,
+        antialias: false,
         alpha: true,
         powerPreference: 'high-performance',
       },
@@ -426,30 +468,19 @@
       .width(initialWidth)
       .height(initialHeight)
       .backgroundColor('rgba(0,0,0,0)')
+      .globeImageUrl(GLOBE_TEXTURE)
+      .bumpImageUrl(GLOBE_BUMP_MAP)
       .showAtmosphere(true)
-      .atmosphereColor('#a29bfe')
-      .atmosphereAltitude(0.12)
-      .enablePointerInteraction(false)
-      .polygonsData(countries.features)
-      .polygonCapColor(() => '#26264f')
-      .polygonSideColor(() => 'rgba(0, 0, 0, 0)')
-      .polygonStrokeColor(() => 'rgba(162, 155, 254, 0.4)')
-      .polygonAltitude(0.006)
-      .polygonsTransitionDuration(0)
-      .pointsMerge(true)
-      .pointsTransitionDuration(0)
-      .pointsData(pts)
-      .pointLat((p) => p.geo[1])
-      .pointLng((p) => p.geo[0])
-      .pointColor((p) => (p.boost ? '#e9d5ff' : '#a29bfe'))
-      .pointAltitude(0.012)
-      .pointRadius(pointRadius);
+      .atmosphereColor('#93c5fd')
+      .atmosphereAltitude(0.14)
+      .enablePointerInteraction(false);
 
-    globe.globeMaterial().color.set('#0b0f2b');
-    globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    globe.globeMaterial().bumpScale = 3;
+    globe.globeMaterial().color.set('#b7c7d9');
+    globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.35));
     window.__globe = globe;
 
-    globe.pointOfView({ lat: 45, lng: 10, altitude: 2 }, 0);
+    globe.pointOfView({ lat: 35, lng: 8, altitude: 1.85 }, 0);
 
     const controls = globe.controls();
     controls.enableDamping = true;
@@ -461,6 +492,144 @@
     controls.addEventListener('start', () => {
       controls.autoRotate = false;
     });
+
+    const pointsCanvas = $('#globe-points');
+    const pointsContext = pointsCanvas.getContext('2d', { alpha: true });
+    const statsEl = $('#globe-stats');
+    const totalStations = pts.reduce((total, place) => total + (Number(place.size) || 0), 0);
+    statsEl.textContent = `${pts.length.toLocaleString()} places · ${totalStations.toLocaleString()} stations`;
+
+    // At a world view several nearby cities occupy the same few pixels. Keep
+    // the busiest one as the visual anchor and roll the density into its size.
+    // Finer levels are selected as the camera approaches the earth.
+    function clusterPlaces(cellSize) {
+      if (!cellSize) {
+        return pts.map((place) => ({
+          place,
+          placeCount: 1,
+          stationCount: Number(place.size) || 0,
+          boost: !!place.boost,
+        }));
+      }
+
+      const cells = new Map();
+      pts.forEach((place) => {
+        const lat = Number(place.geo[1]);
+        const lng = Number(place.geo[0]);
+        const key = `${Math.floor((lat + 90) / cellSize)}:${Math.floor((lng + 180) / cellSize)}`;
+        const stationCount = Number(place.size) || 0;
+        const score = stationCount + (place.boost ? 1000 : 0);
+        const marker = cells.get(key);
+
+        if (!marker) {
+          cells.set(key, {
+            place,
+            placeCount: 1,
+            stationCount,
+            boost: !!place.boost,
+            score,
+          });
+          return;
+        }
+
+        marker.placeCount += 1;
+        marker.stationCount += stationCount;
+        marker.boost = marker.boost || !!place.boost;
+        if (score > marker.score) {
+          marker.place = place;
+          marker.score = score;
+        }
+      });
+      return Array.from(cells.values());
+    }
+
+    const markerLevels = [
+      { maxAltitude: 0.42, markers: clusterPlaces(0) },
+      { maxAltitude: 0.85, markers: clusterPlaces(0.8) },
+      { maxAltitude: 1.5, markers: clusterPlaces(1.6) },
+      { maxAltitude: Infinity, markers: clusterPlaces(2.4) },
+    ];
+
+    let markerWidth = initialWidth;
+    let markerHeight = initialHeight;
+    let markerPixelRatio = 1;
+    let markerFrame = 0;
+    let hoveredPlace = null;
+
+    function resizePointsCanvas(width, height) {
+      markerWidth = width;
+      markerHeight = height;
+      markerPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+      const pixelWidth = Math.max(1, Math.round(width * markerPixelRatio));
+      const pixelHeight = Math.max(1, Math.round(height * markerPixelRatio));
+      if (pointsCanvas.width !== pixelWidth) pointsCanvas.width = pixelWidth;
+      if (pointsCanvas.height !== pixelHeight) pointsCanvas.height = pixelHeight;
+    }
+
+    function drawMarkers() {
+      markerFrame = 0;
+      const pov = globe.pointOfView();
+      const altitude = Math.max(0.01, pov.altitude || 0.01);
+      const level = markerLevels.find((item) => altitude <= item.maxAltitude);
+      const cameraLat = pov.lat * Math.PI / 180;
+      const cameraLng = pov.lng * Math.PI / 180;
+      const sinCameraLat = Math.sin(cameraLat);
+      const cosCameraLat = Math.cos(cameraLat);
+      const horizon = 1 / (1 + altitude) - 0.025;
+      const zoomScale = Math.max(0.9, Math.min(1.2, 1.14 - altitude * 0.07));
+
+      pointsContext.setTransform(markerPixelRatio, 0, 0, markerPixelRatio, 0, 0);
+      pointsContext.clearRect(0, 0, markerWidth, markerHeight);
+      pointsContext.beginPath();
+
+      level.markers.forEach((marker) => {
+        const lat = marker.place.geo[1] * Math.PI / 180;
+        const lng = marker.place.geo[0] * Math.PI / 180;
+        const facing = Math.sin(lat) * sinCameraLat
+          + Math.cos(lat) * cosCameraLat * Math.cos(lng - cameraLng);
+        if (facing < horizon) return;
+
+        const screen = globe.getScreenCoords(marker.place.geo[1], marker.place.geo[0], 0.014);
+        if (
+          screen.x < -8 || screen.y < -8
+          || screen.x > markerWidth + 8 || screen.y > markerHeight + 8
+        ) return;
+
+        const density = Math.log2(marker.stationCount + marker.placeCount * 2 + 1);
+        const radius = (1.65 + Math.min(2.4, density * 0.32) + (marker.boost ? 0.7 : 0))
+          * zoomScale;
+        pointsContext.moveTo(screen.x + radius, screen.y);
+        pointsContext.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+      });
+
+      pointsContext.save();
+      pointsContext.globalCompositeOperation = 'lighter';
+      pointsContext.fillStyle = 'rgba(74, 246, 137, 0.95)';
+      pointsContext.shadowColor = 'rgba(65, 255, 137, 0.9)';
+      pointsContext.shadowBlur = 5;
+      pointsContext.fill();
+      pointsContext.restore();
+
+      if (hoveredPlace) {
+        const screen = globe.getScreenCoords(hoveredPlace.geo[1], hoveredPlace.geo[0], 0.018);
+        pointsContext.beginPath();
+        pointsContext.arc(screen.x, screen.y, 8, 0, Math.PI * 2);
+        pointsContext.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+        pointsContext.lineWidth = 1.5;
+        pointsContext.stroke();
+      }
+    }
+
+    function scheduleMarkerDraw() {
+      if (currentView !== 'globe') return;
+      if (!markerFrame) markerFrame = requestAnimationFrame(drawMarkers);
+    }
+
+    refreshGlobeMarkers = scheduleMarkerDraw;
+    resizePointsCanvas(initialWidth, initialHeight);
+    controls.addEventListener('change', scheduleMarkerDraw);
+    if (currentView === 'globe') scheduleMarkerDraw();
+    else globe.pauseAnimation();
 
     // Use the globe's cheap sphere projection for interaction instead of
     // enabling polygon raycasting over the complete country mesh.
@@ -516,12 +685,20 @@
       const coords = globe.toGlobeCoords(e.clientX - rect.left, e.clientY - rect.top);
       const hit = coords && nearestPlace(coords.lat, coords.lng);
       if (hit) {
+        if (hoveredPlace !== hit) {
+          hoveredPlace = hit;
+          scheduleMarkerDraw();
+        }
         tooltip.textContent = `${hit.title}, ${hit.country} · ${hit.size} station${hit.size === 1 ? '' : 's'}`;
         const wrect = wrap.getBoundingClientRect();
         tooltip.style.left = `${e.clientX - wrect.left + 14}px`;
         tooltip.style.top = `${e.clientY - wrect.top - 10}px`;
         tooltip.classList.remove('hidden');
       } else {
+        if (hoveredPlace) {
+          hoveredPlace = null;
+          scheduleMarkerDraw();
+        }
         tooltip.classList.add('hidden');
       }
     }
@@ -534,6 +711,8 @@
       hoverEvent = null;
       if (hoverFrame) cancelAnimationFrame(hoverFrame);
       hoverFrame = 0;
+      hoveredPlace = null;
+      scheduleMarkerDraw();
       tooltip.classList.add('hidden');
     });
     container.addEventListener('pointerdown', () => tooltip.classList.add('hidden'));
@@ -541,17 +720,30 @@
     let renderedWidth = initialWidth;
     let renderedHeight = initialHeight;
     let resizeFrame = 0;
-    new ResizeObserver(([entry]) => {
-      const width = Math.max(1, Math.round(entry.contentRect.width));
-      const height = Math.max(1, Math.round(entry.contentRect.height));
-      if (width === renderedWidth && height === renderedHeight) return;
-      renderedWidth = width;
-      renderedHeight = height;
+    const resizeObserver = new ResizeObserver(() => {
       cancelAnimationFrame(resizeFrame);
+
       resizeFrame = requestAnimationFrame(() => {
-        globe.width(renderedWidth).height(renderedHeight);
+        const rect = container.getBoundingClientRect();
+        const width = Math.max(1, Math.floor(rect.width));
+        const height = Math.max(1, Math.floor(rect.height));
+
+        // Ignore insignificant one-pixel layout fluctuations.
+        if (
+          Math.abs(width - renderedWidth) < 2 &&
+          Math.abs(height - renderedHeight) < 2
+        ) {
+          return;
+        }
+
+        renderedWidth = width;
+        renderedHeight = height;
+        globe.width(width).height(height);
+        resizePointsCanvas(width, height);
+        scheduleMarkerDraw();
       });
-    }).observe(wrap);
+    });
+    resizeObserver.observe(container);
 
     // Zoom buttons (wheel/pinch zoom is built into the controls)
     function zoomBy(factor) {

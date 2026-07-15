@@ -16,7 +16,7 @@ No accounts, no ads, no tracking. Just open and listen.
 
 - **Thousands of stations in 12,000+ cities** worldwide via the [Radio Garden](https://radio.garden/) API
 - **Discover** — Stations from a rotating selection of featured cities around the globe
-- **Globe** — A WebGL 3D vector globe (Natural Earth country shapes), crisp at any zoom; spin, zoom, and click a city to tune in
+- **Globe** — A smooth WebGL 3D globe with a local 4K NASA Blue Marble texture, terrain relief, and station-density markers; spin, zoom, and click a city to tune in
 - **Search** — Real-time search by station name or place
 - **Browse by Country** — Drill down from country to city to stations
 - **Browse by City** — Every city on the Radio Garden globe, sorted by station count
@@ -96,7 +96,8 @@ OpenRadio/
 - **CSS Custom Properties** for theming
 - **Media Session API** for OS-level media controls
 - **localStorage** for favorites and preferences
-- **globe.gl** (vendored, MIT) — WebGL globe rendering with Natural Earth vector country data
+- **globe.gl** (vendored, MIT) — WebGL globe rendering with local NASA Blue Marble imagery and a lightweight screen-space city-marker layer
+- **NASA Blue Marble** — 4K Earth imagery and topology map, served locally for fast, reliable rendering
 - **Vanilla JavaScript** — no frameworks, no transpilers, no bundlers
 
 ## API
