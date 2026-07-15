@@ -808,26 +808,29 @@
     $('#globe-zoom-out').addEventListener('click', () => zoomBy(1 / 0.65));
   }
 
-  // Globe info popover (the "!" button in the globe's bottom-left corner)
+  // Globe info popover (the "!" button in the globe's bottom-left corner).
+  // Guarded: a cached index.html may not contain this markup yet.
   {
     const infoButton = $('#globe-info-btn');
     const infoPanel = $('#globe-info-panel');
-    const closeInfo = () => {
-      infoPanel.classList.add('hidden');
-      infoButton.setAttribute('aria-expanded', 'false');
-    };
-    infoButton.addEventListener('click', (event) => {
-      event.stopPropagation();
-      const open = !infoPanel.classList.toggle('hidden');
-      infoButton.setAttribute('aria-expanded', String(open));
-    });
-    document.addEventListener('click', (event) => {
-      if (infoPanel.classList.contains('hidden') || infoPanel.contains(event.target)) return;
-      closeInfo();
-    });
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && !infoPanel.classList.contains('hidden')) closeInfo();
-    });
+    if (infoButton && infoPanel) {
+      const closeInfo = () => {
+        infoPanel.classList.add('hidden');
+        infoButton.setAttribute('aria-expanded', 'false');
+      };
+      infoButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const open = !infoPanel.classList.toggle('hidden');
+        infoButton.setAttribute('aria-expanded', String(open));
+      });
+      document.addEventListener('click', (event) => {
+        if (infoPanel.classList.contains('hidden') || infoPanel.contains(event.target)) return;
+        closeInfo();
+      });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !infoPanel.classList.contains('hidden')) closeInfo();
+      });
+    }
   }
 
   // MapLibre uses the same public architecture as Radio Garden: globe

@@ -8,6 +8,10 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **No crash on cached pages** — browsers holding a cached index.html
+  receive the newest app.js regardless of the cache-busting query, so the
+  info-button wiring could hit missing markup and abort the whole script.
+  The wiring is now guarded against absent elements.
 - **Globe info button** — a round "!" button in the globe's bottom-left
   corner opens a glass info panel with usage hints (drag to spin, zoom
   dives toward the cursor, click a dot to tune in) and the imagery and
