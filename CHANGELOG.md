@@ -8,6 +8,17 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Brand icon, link previews, and SEO** — the site now has a real identity
+  everywhere it appears. A new broadcast-waves mark (purple gradient on a
+  dark tile, `assets/icon.svg`) replaces the 📻 emoji as the favicon, the
+  sidebar logo, and the placeholder tile on station cards, with PNG
+  renders for Apple touch icon, PWA manifest icons (including a maskable
+  variant), and a 32px fallback favicon. Sharing a link now shows a proper
+  preview card: a rendered 1200×630 Open Graph image plus full
+  `og:*`/`twitter:*` meta tags. Search engines get a descriptive title and
+  meta description, a canonical URL, JSON-LD `WebApplication` structured
+  data, `robots.txt`, and `sitemap.xml`, and the app is installable via a
+  new `site.webmanifest`.
 - **Mobile responsiveness pass** — the app now behaves properly on phones
   and tablets. The layout sizes itself with dynamic viewport units so the
   player bar is never hidden behind a mobile browser's collapsing URL bar,

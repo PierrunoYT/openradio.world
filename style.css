@@ -142,7 +142,10 @@ input[type="text"] {
 }
 
 .logo-icon {
-  font-size: 1.6rem;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 8px var(--accent-glow));
 }
 
 .tagline {

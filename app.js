@@ -1681,7 +1681,7 @@ void main() {
       const fav = isFavorite(station.id);
 
       card.innerHTML = `
-        <div class="station-favicon">📻</div>
+        <div class="station-favicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49"/><path d="M7.76 16.25a6 6 0 0 1 0-8.49"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 19.07a10 10 0 0 1 0-14.14"/></svg></div>
         <div class="station-info">
           <span class="station-name" title="${escapeAttr(station.name)}">${escapeHtml(station.name)}</span>
           <span class="station-tags">${escapeHtml(tags)}</span>

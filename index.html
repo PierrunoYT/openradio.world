@@ -3,19 +3,87 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>OpenRadio - Worldwide Internet Radio</title>
+  <title>OpenRadio — Listen to Live Radio Stations Worldwide for Free</title>
+  <meta name="description" content="Tune in to thousands of live internet radio stations from every corner of the world. Spin an interactive 3D globe, browse by country or city, and save your favorites — free, no signup needed." />
+  <meta name="theme-color" content="#0a0a0f" />
+  <link rel="canonical" href="https://openradio.world/" />
+
+  <!-- Open Graph (link previews on Facebook, WhatsApp, Slack, Discord, iMessage, …) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="OpenRadio" />
+  <meta property="og:url" content="https://openradio.world/" />
+  <meta property="og:title" content="OpenRadio — Listen to Live Radio Stations Worldwide for Free" />
+  <meta property="og:description" content="Tune in to thousands of live internet radio stations from every corner of the world. Spin an interactive 3D globe, browse by country or city, and save your favorites — free, no signup needed." />
+  <meta property="og:image" content="https://openradio.world/assets/og-image.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="OpenRadio — listen live to radio stations from every corner of the world" />
+  <meta property="og:locale" content="en_US" />
+
+  <!-- Twitter / X card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="OpenRadio — Listen to Live Radio Stations Worldwide for Free" />
+  <meta name="twitter:description" content="Tune in to thousands of live internet radio stations from every corner of the world. Spin an interactive 3D globe, browse by country or city, and save your favorites — free, no signup needed." />
+  <meta name="twitter:image" content="https://openradio.world/assets/og-image.png" />
+  <meta name="twitter:image:alt" content="OpenRadio — listen live to radio stations from every corner of the world" />
+
+  <!-- Icons & PWA -->
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+  <link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+  <link rel="manifest" href="site.webmanifest" />
+  <meta name="apple-mobile-web-app-title" content="OpenRadio" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=mobile-responsive-1" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📻</text></svg>" />
+  <link rel="stylesheet" href="style.css?v=brand-seo-1" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "OpenRadio",
+    "alternateName": "OpenRadio — Worldwide Internet Radio",
+    "url": "https://openradio.world/",
+    "description": "Listen live to thousands of internet radio stations from every corner of the world on an interactive 3D globe. Browse by country or city and save favorites — free, no signup needed.",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Any",
+    "browserRequirements": "Requires JavaScript",
+    "image": "https://openradio.world/assets/og-image.png",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    }
+  }
+  </script>
 </head>
 <body>
   <div id="app">
     <!-- Sidebar -->
     <aside id="sidebar">
       <div class="sidebar-header">
-        <h1 class="logo"><span class="logo-icon">📻</span> OpenRadio</h1>
+        <h1 class="logo">
+          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="logo-grad" x1="4" y1="4" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stop-color="#a29bfe"/>
+                <stop offset="1" stop-color="#6c5ce7"/>
+              </linearGradient>
+            </defs>
+            <g stroke="url(#logo-grad)" stroke-width="2" stroke-linecap="round">
+              <circle cx="12" cy="12" r="2" fill="url(#logo-grad)" stroke="none"/>
+              <path d="M16.24 7.76a6 6 0 0 1 0 8.49"/>
+              <path d="M7.76 16.25a6 6 0 0 1 0-8.49"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+              <path d="M4.93 19.07a10 10 0 0 1 0-14.14"/>
+            </g>
+          </svg>
+          OpenRadio
+        </h1>
         <p class="tagline">Worldwide Internet Radio</p>
       </div>
 
@@ -186,6 +254,6 @@
   </div>
 
   <audio id="audio-player" preload="none"></audio>
-  <script src="app.js?v=mobile-responsive-1"></script>
+  <script src="app.js?v=brand-seo-1"></script>
 </body>
 </html>
