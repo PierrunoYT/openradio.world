@@ -8,6 +8,14 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Working asymmetric wheel zoom** — the previous zoom-out fix replaced the
+  whole wheel handler, but MapLibre's `easeTo` ignores anchor points under
+  globe projection, so the cursor-anchored dive was silently lost. Zooming
+  in is back on MapLibre's native scroll handler (which anchors correctly on
+  the globe); only downward wheel events are intercepted before MapLibre
+  sees them and eased around the screen center. Verified in a headless
+  browser: zoom-out recedes straight back, zoom-in pulls the center toward
+  the pointer.
 - **Straight-back zoom out** — cursor-anchored zooming now only applies when
   zooming in (diving toward the place under the pointer); zooming out
   recedes around the screen center, removing the orbit-like swing the globe

@@ -1238,7 +1238,7 @@ void main() {
         bearing: 0,
         attributionControl: false,
         doubleClickZoom: false,
-        scrollZoom: false,
+        scrollZoom: true,
         reduceMotion: true,
         pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
         canvasContextAttributes: { antialias: true },
@@ -1292,28 +1292,23 @@ void main() {
       };
       container.addEventListener('pointerdown', stopAutoRotate);
 
-      // Custom wheel zoom: zooming in anchors on the cursor so you dive
-      // toward the place under it, but zooming out recedes around the screen
-      // center — cursor-anchored zoom-out makes the whole globe orbit the
-      // pointer, which feels like the globe swinging away.
+      // Asymmetric wheel zoom: zooming in stays on MapLibre's native scroll
+      // handler, which anchors on the cursor even under globe projection, so
+      // you dive toward the place beneath the pointer. Zooming out is
+      // intercepted in the capture phase (before MapLibre sees it) and eased
+      // around the screen center instead — cursor-anchored zoom-out makes the
+      // whole globe orbit the pointer, which reads as the globe swinging away.
       container.addEventListener('wheel', (event) => {
-        event.preventDefault();
         stopAutoRotate();
+        if (event.deltaY <= 0) return;
+        event.preventDefault();
+        event.stopPropagation();
         const lineScale = event.deltaMode === 1 ? 20 : 1;
         const rate = event.ctrlKey ? 0.008 : 0.0022;
         const delta = -event.deltaY * lineScale * rate;
-        if (!delta) return;
         const zoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), map.getZoom() + delta));
-        const options = { zoom, duration: 90, easing: (t) => t };
-        if (delta > 0) {
-          const rect = map.getCanvas().getBoundingClientRect();
-          options.around = map.unproject([
-            event.clientX - rect.left,
-            event.clientY - rect.top,
-          ]);
-        }
-        map.easeTo(options);
-      }, { passive: false });
+        map.easeTo({ zoom, duration: 90, easing: (t) => t });
+      }, { passive: false, capture: true });
 
       map.on('mousemove', (event) => {
         const point = event.point;
