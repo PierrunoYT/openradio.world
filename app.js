@@ -2006,8 +2006,15 @@ void main() {
   let waveFrequencyData = null;
   let waveAnimationFrame = 0;
   const waveLevels = new Float32Array(3);
+  const waveTargetLevels = new Float32Array(3);
   const waveContext = playerWave ? playerWave.getContext('2d') : null;
   const reducedWaveMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const rootStyles = getComputedStyle(document.documentElement);
+  const waveColors = [
+    rootStyles.getPropertyValue('--amber-hi').trim() || '#ffc46b',
+    rootStyles.getPropertyValue('--live').trim() || '#4af689',
+    rootStyles.getPropertyValue('--text-mid').trim() || '#9aa5bc',
+  ];
 
   function ensurePlayerWaveAnalyser() {
     if (!LIVE_API_ENABLED || !waveContext) return;
@@ -2025,8 +2032,8 @@ void main() {
       const context = new AudioContextClass();
       const source = context.createMediaElementSource(audio);
       const analyser = context.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.72;
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.78;
       source.connect(analyser);
       analyser.connect(context.destination);
       waveAudioContext = context;
@@ -2038,10 +2045,21 @@ void main() {
     }
   }
 
-  function measureWaveLevel(start, end) {
-    let total = 0;
-    for (let i = start; i < end; i++) total += waveFrequencyData[i];
-    return Math.max(0, Math.min(1, (total / (end - start) - 12) / 210));
+  function measureWaveLevel(minHz, maxHz) {
+    if (!waveAnalyser || !waveAudioContext || !waveFrequencyData) return 0;
+
+    const binWidth = waveAudioContext.sampleRate / waveAnalyser.fftSize;
+    const start = Math.max(1, Math.floor(minHz / binWidth));
+    const end = Math.min(waveFrequencyData.length, Math.ceil(maxHz / binWidth));
+    if (end <= start) return 0;
+
+    let energy = 0;
+    for (let i = start; i < end; i++) {
+      const normalized = waveFrequencyData[i] / 255;
+      energy += normalized * normalized;
+    }
+    const rms = Math.sqrt(energy / (end - start));
+    return Math.max(0, Math.min(1, (rms - 0.035) / 0.58));
   }
 
   function drawPlayerWave(timestamp = 0) {
@@ -2059,38 +2077,60 @@ void main() {
     waveContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
     waveContext.clearRect(0, 0, width, height);
 
-    waveLevels.fill(0);
+    waveTargetLevels.fill(0);
     if (waveAnalyser && isPlaying) {
       waveAnalyser.getByteFrequencyData(waveFrequencyData);
-      waveLevels[0] = measureWaveLevel(1, 12);
-      waveLevels[1] = measureWaveLevel(12, 42);
-      waveLevels[2] = measureWaveLevel(42, 96);
+      waveTargetLevels[0] = measureWaveLevel(60, 300);
+      waveTargetLevels[1] = measureWaveLevel(300, 2200);
+      waveTargetLevels[2] = measureWaveLevel(2200, 9000);
     }
 
-    const centers = [height * 0.25, height * 0.5, height * 0.75];
-    const cycles = [1.4, 2.1, 2.8];
-    const speeds = [1.7, -1.25, 0.9];
-    const colors = ['rgba(255, 196, 107, 0.92)', 'rgba(74, 246, 137, 0.82)', 'rgba(154, 165, 188, 0.68)'];
+    for (let line = 0; line < waveLevels.length; line++) {
+      const smoothing = waveTargetLevels[line] > waveLevels[line] ? 0.32 : 0.09;
+      waveLevels[line] += (waveTargetLevels[line] - waveLevels[line]) * smoothing;
+    }
+
+    const centers = [height / 6, height / 2, height * 5 / 6];
+    const cycles = [1.25, 1.85, 2.55];
+    const speeds = [1.55, -1.1, 0.78];
     const elapsed = timestamp * 0.001;
 
-    waveContext.lineWidth = 1.4;
     waveContext.lineCap = 'round';
     waveContext.lineJoin = 'round';
     for (let line = 0; line < 3; line++) {
-      const amplitude = 0.8 + waveLevels[line] * height * 0.14;
+      const activity = isPlaying ? 0.3 + waveLevels[line] * 0.7 : 0;
+      const amplitude = 0.38 + activity * height * 0.105;
       const phase = elapsed * speeds[line];
+
       waveContext.beginPath();
-      waveContext.strokeStyle = colors[line];
-      for (let x = 0; x <= width; x += 2) {
+      waveContext.moveTo(3, centers[line]);
+      waveContext.lineTo(width - 3, centers[line]);
+      waveContext.lineWidth = 0.65;
+      waveContext.globalAlpha = 0.13;
+      waveContext.strokeStyle = waveColors[line];
+      waveContext.shadowBlur = 0;
+      waveContext.stroke();
+
+      waveContext.beginPath();
+      waveContext.lineWidth = line === 1 ? 1.55 : 1.25;
+      waveContext.globalAlpha = line === 2 ? 0.68 : 0.9;
+      waveContext.strokeStyle = waveColors[line];
+      waveContext.shadowColor = waveColors[line];
+      waveContext.shadowBlur = isPlaying ? 5 : 0;
+      for (let x = 0; x <= width; x += 1.5) {
         const progress = x / width;
-        const envelope = Math.sin(Math.PI * progress);
+        const envelope = Math.pow(Math.sin(Math.PI * progress), 0.7);
+        const primary = Math.sin(progress * Math.PI * 2 * cycles[line] + phase);
+        const detail = Math.sin(progress * Math.PI * 2 * (cycles[line] * 2.35) - phase * 0.65) * 0.22;
         const y = centers[line]
-          + Math.sin(progress * Math.PI * 2 * cycles[line] + phase) * amplitude * envelope;
+          + (primary + detail * activity) * amplitude * envelope;
         if (x === 0) waveContext.moveTo(x, y);
         else waveContext.lineTo(x, y);
       }
       waveContext.stroke();
     }
+    waveContext.globalAlpha = 1;
+    waveContext.shadowBlur = 0;
   }
 
   function animatePlayerWave(timestamp) {
@@ -2113,6 +2153,8 @@ void main() {
   function stopPlayerWave() {
     if (waveAnimationFrame) cancelAnimationFrame(waveAnimationFrame);
     waveAnimationFrame = 0;
+    waveLevels.fill(0);
+    waveTargetLevels.fill(0);
     drawPlayerWave();
   }
 
@@ -2205,6 +2247,9 @@ void main() {
     iconPlay.classList.toggle('hidden', isPlaying || isLoading);
     iconPause.classList.toggle('hidden', !isPlaying || isLoading);
     iconLoading.classList.toggle('hidden', !isLoading);
+    playerBar.classList.toggle('is-playing', isPlaying);
+    playerBar.classList.toggle('is-loading', isLoading);
+    btnPlay.setAttribute('aria-label', isLoading ? 'Loading station' : isPlaying ? 'Pause' : 'Play');
 
     updatePlayerFavButton();
 
@@ -2281,11 +2326,13 @@ void main() {
     const vol = saved ? parseInt(saved, 10) : 80;
     volumeSlider.value = vol;
     audio.volume = vol / 100;
+    volumeSlider.style.setProperty('--volume-level', `${vol}%`);
   }
 
   function setVolume(val) {
     audio.volume = val / 100;
     localStorage.setItem(VOL_KEY, val);
+    volumeSlider.style.setProperty('--volume-level', `${val}%`);
     updateVolumeIcon();
   }
 
@@ -2299,6 +2346,7 @@ void main() {
       audio.volume = prev;
       volumeSlider.value = Math.round(prev * 100);
     }
+    volumeSlider.style.setProperty('--volume-level', `${volumeSlider.value}%`);
     updateVolumeIcon();
   }
 
