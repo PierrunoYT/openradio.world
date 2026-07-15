@@ -341,14 +341,19 @@
       return;
     }
 
-    // Vector globe: country polygons on a colored sphere — crisp at any zoom
-    const globe = Globe()(container)
+    // Vector globe: country polygons on a colored sphere — crisp at any zoom.
+    // Pointer interaction is disabled: globe.gl would otherwise raycast the
+    // whole tessellated country geometry on every mouse move, which stutters.
+    // Clicks and the hover tooltip are handled manually via toGlobeCoords
+    // (a single cheap ray-vs-sphere test).
+    const globe = Globe({ rendererConfig: { antialias: true, powerPreference: 'high-performance' } })(container)
       .width(wrap.clientWidth)
       .height(wrap.clientHeight)
       .backgroundColor('rgba(0,0,0,0)')
       .showAtmosphere(true)
       .atmosphereColor('#a29bfe')
       .atmosphereAltitude(0.15)
+      .enablePointerInteraction(false)
       .polygonsData(countries.features)
       .polygonCapColor(() => '#26264f')
       .polygonSideColor(() => 'rgba(0, 0, 0, 0)')
@@ -356,23 +361,17 @@
       .polygonAltitude(0.002)
       .polygonsTransitionDuration(0)
       .pointsMerge(true)
+      .pointsTransitionDuration(0)
       .pointsData(pts)
       .pointLat((p) => p.geo[1])
       .pointLng((p) => p.geo[0])
       .pointColor((p) => (p.boost ? '#e9d5ff' : '#a29bfe'))
       .pointAltitude(0.004)
-      .pointRadius((p) => (p.boost ? 0.2 : p.size > 40 ? 0.14 : 0.09))
-      .onGlobeClick(({ lat, lng }) => {
-        const hit = nearestPlace(lat, lng);
-        if (hit) {
-          showPlaceStations(hit, stationsEl, 'Back to Globe', () => {
-            stationsEl.classList.add('hidden');
-          });
-          stationsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      });
+      .pointRadius((p) => (p.boost ? 0.2 : p.size > 40 ? 0.14 : 0.09));
 
     globe.globeMaterial().color.set('#0b0f2b'); // ocean
+    // Cap the render resolution on very high-DPI screens
+    globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
 
     globe.pointOfView({ lat: 45, lng: 10, altitude: 2 }, 0);
 
@@ -385,15 +384,16 @@
       controls.autoRotate = false;
     });
 
-    // Shrink the city points as the camera gets closer, so a zoomed-in
-    // view shows fine dots instead of fat cylinders. Rebuilding the merged
-    // geometry is not free, so do it debounced and only on real change.
+    // Shrink the city points as the camera gets closer, so a zoomed-in view
+    // shows small pins instead of fat cylinders. The floor keeps them from
+    // ever dropping below visible size. Rebuilding the merged geometry is
+    // not free, so do it debounced and only on real change.
     let pointScale = 1;
     let zoomTimer = null;
     function updatePointScale() {
       const alt = globe.pointOfView().altitude;
-      const s = Math.max(0.04, Math.min(1, alt / 2));
-      if (Math.abs(s - pointScale) / pointScale < 0.25) return;
+      const s = Math.max(0.24, Math.min(1, alt / 1.4));
+      if (Math.abs(s - pointScale) / pointScale < 0.2) return;
       pointScale = s;
       globe
         .pointRadius((p) => (p.boost ? 0.2 : p.size > 40 ? 0.14 : 0.09) * s)
@@ -402,6 +402,27 @@
     controls.addEventListener('change', () => {
       clearTimeout(zoomTimer);
       zoomTimer = setTimeout(updatePointScale, 150);
+    });
+
+    // Manual click handling (pointer interaction is disabled above):
+    // a press-release with barely any movement counts as a click.
+    let downX = 0;
+    let downY = 0;
+    container.addEventListener('pointerdown', (e) => {
+      downX = e.clientX;
+      downY = e.clientY;
+    });
+    container.addEventListener('pointerup', (e) => {
+      if (Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY) > 6) return;
+      const rect = container.getBoundingClientRect();
+      const coords = globe.toGlobeCoords(e.clientX - rect.left, e.clientY - rect.top);
+      const hit = coords && nearestPlace(coords.lat, coords.lng);
+      if (hit) {
+        showPlaceStations(hit, stationsEl, 'Back to Globe', () => {
+          stationsEl.classList.add('hidden');
+        });
+        stationsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     });
 
     // Nearest place to a lat/lng, accepted within a zoom-scaled radius

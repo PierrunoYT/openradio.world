@@ -16,8 +16,13 @@ rather than by version number. Newest first.
   at every zoom level, which fixed the pixelation when zooming in close.
 - **City points scale with zoom** — the 12,000+ city dots shrink as the
   camera gets closer, so a zoomed-in view shows fine dots instead of fat
-  cylinders. The merged point geometry rebuilds debounced to keep zooming
-  smooth.
+  cylinders, with a size floor so they never vanish. The merged point
+  geometry rebuilds debounced to keep zooming smooth.
+- **Smoother interaction** — globe.gl's built-in pointer raycasting (which
+  tested the whole tessellated country geometry on every mouse move) is
+  disabled; hover and click are resolved with a single cheap ray-vs-sphere
+  test plus a nearest-city lookup. Render resolution is capped on very
+  high-DPI screens and the renderer requests the high-performance GPU.
 - **GPU rendering** — the globe runs on WebGL via a vendored copy of
   [globe.gl](https://github.com/vasturiano/globe.gl) (MIT, three.js bundled,
   loaded lazily the first time the view opens). This replaced two earlier
