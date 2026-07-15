@@ -866,8 +866,6 @@
       }
 
       const markers = places.filter((place) => Array.isArray(place.geo) && place.geo.length === 2);
-      const byId = new Map(markers.map((place) => [place.id, place]));
-      const earthRadiusMeters = 6371008.8;
       function columnRadiusMeters(place) {
         const stationWeight = Math.log1p(Number(place.size) || 0);
         return 2600 + Math.min(2000, stationWeight * 360);
@@ -875,44 +873,285 @@
       function columnHeightMeters(place) {
         return Math.round(160000 + Math.min(240000, Math.log1p(Number(place.size) || 0) * 40000));
       }
-      function markerColumnRing(place) {
-        const longitude = Number(place.geo[0]);
-        const latitude = Number(place.geo[1]);
-        const radiusMeters = columnRadiusMeters(place);
-        const angularRadius = radiusMeters / earthRadiusMeters;
-        const latitudeRadians = latitude * Math.PI / 180;
-        const longitudeRadians = longitude * Math.PI / 180;
-        const ring = [];
 
-        for (let side = 0; side <= 8; side += 1) {
-          const bearing = (side % 8) * Math.PI / 4;
-          const columnLatitude = Math.asin(
-            Math.sin(latitudeRadians) * Math.cos(angularRadius)
-            + Math.cos(latitudeRadians) * Math.sin(angularRadius) * Math.cos(bearing),
+      // Custom WebGL layer: all spikes render as one instanced draw call of
+      // octagonal prisms. MapLibre's injected shader prelude (projectTileFor3D)
+      // places them on the globe or mercator plane, including the projection
+      // transition and horizon clipping. A second on-demand pass renders each
+      // spike's id as a color into an offscreen buffer, so hover/click picking
+      // is pixel-exact anywhere on a spike's visible body.
+      function createSpikeLayer() {
+        const SIDES = 8;
+        const template = [];
+        const lightX = 0.55;
+        const lightY = -0.84;
+        for (let side = 0; side < SIDES; side += 1) {
+          const angle0 = (side / SIDES) * Math.PI * 2;
+          const angle1 = ((side + 1) / SIDES) * Math.PI * 2;
+          const x0 = Math.cos(angle0);
+          const y0 = Math.sin(angle0);
+          const x1 = Math.cos(angle1);
+          const y1 = Math.sin(angle1);
+          const normalX = Math.cos((angle0 + angle1) / 2);
+          const normalY = Math.sin((angle0 + angle1) / 2);
+          const shade = 0.6 + 0.4 * Math.max(0, normalX * lightX + normalY * lightY);
+          template.push(
+            x0, y0, 0, shade, x1, y1, 0, shade, x0, y0, 1, shade,
+            x0, y0, 1, shade, x1, y1, 0, shade, x1, y1, 1, shade,
           );
-          const columnLongitude = longitudeRadians + Math.atan2(
-            Math.sin(bearing) * Math.sin(angularRadius) * Math.cos(latitudeRadians),
-            Math.cos(angularRadius) - Math.sin(latitudeRadians) * Math.sin(columnLatitude),
-          );
-          let columnLongitudeDegrees = columnLongitude * 180 / Math.PI;
-          while (columnLongitudeDegrees - longitude > 180) columnLongitudeDegrees -= 360;
-          while (columnLongitudeDegrees - longitude < -180) columnLongitudeDegrees += 360;
-          ring.push([columnLongitudeDegrees, columnLatitude * 180 / Math.PI]);
         }
-        return ring;
-      }
-      const markerColumnData = {
-        type: 'FeatureCollection',
-        features: markers.map((place) => ({
-          type: 'Feature',
-          id: place.id,
-          properties: {
-            id: place.id,
-            height: columnHeightMeters(place),
+        for (let side = 0; side < SIDES; side += 1) {
+          const angle0 = (side / SIDES) * Math.PI * 2;
+          const angle1 = ((side + 1) / SIDES) * Math.PI * 2;
+          template.push(
+            0, 0, 1, 1.2,
+            Math.cos(angle0), Math.sin(angle0), 1, 1.2,
+            Math.cos(angle1), Math.sin(angle1), 1, 1.2,
+          );
+        }
+        const templateVertexCount = template.length / 4;
+
+        const INSTANCE_STRIDE = 7;
+        const instanceData = new Float32Array(markers.length * INSTANCE_STRIDE);
+        markers.forEach((place, index) => {
+          const mercator = maplibregl.MercatorCoordinate.fromLngLat(
+            { lng: Number(place.geo[0]), lat: Number(place.geo[1]) },
+            0,
+          );
+          const metersToMercator = mercator.meterInMercatorCoordinateUnits();
+          const id = index + 1;
+          const offset = index * INSTANCE_STRIDE;
+          instanceData[offset] = mercator.x;
+          instanceData[offset + 1] = mercator.y;
+          instanceData[offset + 2] = columnRadiusMeters(place) * metersToMercator;
+          instanceData[offset + 3] = columnHeightMeters(place);
+          instanceData[offset + 4] = (id & 255) / 255;
+          instanceData[offset + 5] = ((id >> 8) & 255) / 255;
+          instanceData[offset + 6] = ((id >> 16) & 255) / 255;
+        });
+
+        const PICK_DOWNSCALE = 2;
+        const fragmentSource = `#version 300 es
+precision highp float;
+in float v_up;
+flat in float v_shade;
+flat in vec3 v_pick;
+uniform float u_pick_mode;
+out vec4 fragColor;
+void main() {
+  if (u_pick_mode > 0.5) {
+    fragColor = vec4(v_pick, 1.0);
+    return;
+  }
+  vec3 base = vec3(1.0, 0.176, 0.471);
+  vec3 color = base * (v_shade * mix(0.5, 1.0, v_up));
+  color = mix(color, vec3(1.0, 0.75, 0.88), v_up * v_up * 0.35);
+  fragColor = vec4(color, 1.0);
+}`;
+
+        return {
+          id: 'place-spikes',
+          type: 'custom',
+          renderingMode: '3d',
+          programs: new Map(),
+          pendingPick: null,
+
+          onAdd(mapInstance, gl) {
+            this.map = mapInstance;
+            this.templateBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.templateBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(template), gl.STATIC_DRAW);
+            this.instanceBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, instanceData, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
           },
-          geometry: { type: 'Polygon', coordinates: [markerColumnRing(place)] },
-        })),
-      };
+
+          onRemove(mapInstance, gl) {
+            this.programs.forEach((entry) => gl.deleteProgram(entry.program));
+            this.programs.clear();
+            if (this.vao) gl.deleteVertexArray(this.vao);
+            if (this.templateBuffer) gl.deleteBuffer(this.templateBuffer);
+            if (this.instanceBuffer) gl.deleteBuffer(this.instanceBuffer);
+            if (this.pickTexture) gl.deleteTexture(this.pickTexture);
+            if (this.pickDepth) gl.deleteRenderbuffer(this.pickDepth);
+            if (this.pickFramebuffer) gl.deleteFramebuffer(this.pickFramebuffer);
+          },
+
+          getProgram(gl, shaderData) {
+            const cached = this.programs.get(shaderData.variantName);
+            if (cached) return cached;
+            const vertexSource = `#version 300 es
+${shaderData.vertexShaderPrelude}
+${shaderData.define}
+in vec2 a_offset;
+in float a_up;
+in float a_shade;
+in vec4 a_center;
+in vec3 a_pick;
+out float v_up;
+flat out float v_shade;
+flat out vec3 v_pick;
+void main() {
+  vec2 pos = a_center.xy + a_offset * a_center.z;
+  gl_Position = projectTileFor3D(pos, a_up * a_center.w);
+  v_up = a_up;
+  v_shade = a_shade;
+  v_pick = a_pick;
+}`;
+            const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vertexShader, vertexSource);
+            gl.compileShader(vertexShader);
+            const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(fragmentShader, fragmentSource);
+            gl.compileShader(fragmentShader);
+            const program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.bindAttribLocation(program, 0, 'a_offset');
+            gl.bindAttribLocation(program, 1, 'a_up');
+            gl.bindAttribLocation(program, 2, 'a_shade');
+            gl.bindAttribLocation(program, 3, 'a_center');
+            gl.bindAttribLocation(program, 4, 'a_pick');
+            gl.linkProgram(program);
+            gl.deleteShader(vertexShader);
+            gl.deleteShader(fragmentShader);
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+              console.error('Spike layer shader failed to link:', gl.getProgramInfoLog(program));
+            }
+            const entry = {
+              program,
+              uniforms: {
+                projectionMatrix: gl.getUniformLocation(program, 'u_projection_matrix'),
+                fallbackMatrix: gl.getUniformLocation(program, 'u_projection_fallback_matrix'),
+                tileMercatorCoords: gl.getUniformLocation(program, 'u_projection_tile_mercator_coords'),
+                clippingPlane: gl.getUniformLocation(program, 'u_projection_clipping_plane'),
+                transition: gl.getUniformLocation(program, 'u_projection_transition'),
+                pickMode: gl.getUniformLocation(program, 'u_pick_mode'),
+              },
+            };
+            this.programs.set(shaderData.variantName, entry);
+            return entry;
+          },
+
+          getVao(gl) {
+            if (this.vao) return this.vao;
+            this.vao = gl.createVertexArray();
+            gl.bindVertexArray(this.vao);
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.templateBuffer);
+            gl.enableVertexAttribArray(0);
+            gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 16, 0);
+            gl.enableVertexAttribArray(1);
+            gl.vertexAttribPointer(1, 1, gl.FLOAT, false, 16, 8);
+            gl.enableVertexAttribArray(2);
+            gl.vertexAttribPointer(2, 1, gl.FLOAT, false, 16, 12);
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
+            gl.enableVertexAttribArray(3);
+            gl.vertexAttribPointer(3, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, 0);
+            gl.vertexAttribDivisor(3, 1);
+            gl.enableVertexAttribArray(4);
+            gl.vertexAttribPointer(4, 3, gl.FLOAT, false, INSTANCE_STRIDE * 4, 16);
+            gl.vertexAttribDivisor(4, 1);
+            gl.bindVertexArray(null);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+            return this.vao;
+          },
+
+          drawSpikes(gl, entry, args, pickMode) {
+            const projection = args.defaultProjectionData;
+            gl.useProgram(entry.program);
+            gl.uniformMatrix4fv(entry.uniforms.projectionMatrix, false, projection.mainMatrix);
+            gl.uniformMatrix4fv(entry.uniforms.fallbackMatrix, false, projection.fallbackMatrix);
+            gl.uniform4f(entry.uniforms.tileMercatorCoords, ...projection.tileMercatorCoords);
+            gl.uniform4f(entry.uniforms.clippingPlane, ...projection.clippingPlane);
+            gl.uniform1f(entry.uniforms.transition, projection.projectionTransition);
+            gl.uniform1f(entry.uniforms.pickMode, pickMode);
+            gl.bindVertexArray(this.getVao(gl));
+            gl.drawArraysInstanced(gl.TRIANGLES, 0, templateVertexCount, markers.length);
+            gl.bindVertexArray(null);
+          },
+
+          ensurePickTarget(gl) {
+            const width = Math.max(1, Math.floor(gl.drawingBufferWidth / PICK_DOWNSCALE));
+            const height = Math.max(1, Math.floor(gl.drawingBufferHeight / PICK_DOWNSCALE));
+            if (this.pickFramebuffer && this.pickWidth === width && this.pickHeight === height) return;
+            if (this.pickTexture) gl.deleteTexture(this.pickTexture);
+            if (this.pickDepth) gl.deleteRenderbuffer(this.pickDepth);
+            if (this.pickFramebuffer) gl.deleteFramebuffer(this.pickFramebuffer);
+            this.pickWidth = width;
+            this.pickHeight = height;
+            this.pickTexture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, this.pickTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+            this.pickDepth = gl.createRenderbuffer();
+            gl.bindRenderbuffer(gl.RENDERBUFFER, this.pickDepth);
+            gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+            gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+            this.pickFramebuffer = gl.createFramebuffer();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this.pickFramebuffer);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.pickTexture, 0);
+            gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.pickDepth);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          },
+
+          resolvePick(gl, entry, args) {
+            const pick = this.pendingPick;
+            this.pendingPick = null;
+            const canvas = this.map.getCanvas();
+            const scaleX = gl.drawingBufferWidth / (canvas.clientWidth || canvas.width);
+            const scaleY = gl.drawingBufferHeight / (canvas.clientHeight || canvas.height);
+            this.ensurePickTarget(gl);
+            const previousFramebuffer = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+            const previousViewport = gl.getParameter(gl.VIEWPORT);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this.pickFramebuffer);
+            gl.viewport(0, 0, this.pickWidth, this.pickHeight);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clearDepth(1);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            this.drawSpikes(gl, entry, args, 1);
+            const pixelX = Math.min(
+              this.pickWidth - 1,
+              Math.max(0, Math.round(pick.point.x * scaleX / PICK_DOWNSCALE)),
+            );
+            const pixelY = Math.min(
+              this.pickHeight - 1,
+              Math.max(0, this.pickHeight - 1 - Math.round(pick.point.y * scaleY / PICK_DOWNSCALE)),
+            );
+            const pixel = new Uint8Array(4);
+            gl.readPixels(pixelX, pixelY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, previousFramebuffer);
+            gl.viewport(previousViewport[0], previousViewport[1], previousViewport[2], previousViewport[3]);
+            const id = pixel[0] | (pixel[1] << 8) | (pixel[2] << 16);
+            const place = id > 0 ? markers[id - 1] || null : null;
+            pick.callbacks.forEach((callback) => callback(place));
+          },
+
+          render(gl, args) {
+            const entry = this.getProgram(gl, args.shaderData);
+            gl.enable(gl.DEPTH_TEST);
+            gl.depthFunc(gl.LEQUAL);
+            gl.depthMask(true);
+            gl.disable(gl.BLEND);
+            gl.disable(gl.CULL_FACE);
+            this.drawSpikes(gl, entry, args, 0);
+            if (this.pendingPick) this.resolvePick(gl, entry, args);
+          },
+
+          pick(point, callback) {
+            if (this.pendingPick) {
+              this.pendingPick.point = point;
+              this.pendingPick.callbacks.push(callback);
+            } else {
+              this.pendingPick = { point, callbacks: [callback] };
+            }
+            if (this.map) this.map.triggerRepaint();
+          },
+        };
+      }
+      const spikeLayer = createSpikeLayer();
       const map = new maplibregl.Map({
         container,
         center: [8, 35],
@@ -926,6 +1165,7 @@
         scrollZoom: true,
         reduceMotion: true,
         pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
+        canvasContextAttributes: { antialias: true },
         style: {
           version: 8,
           projection: { type: 'globe' },
@@ -937,26 +1177,10 @@
               maxzoom: 19,
               attribution: 'Tiles © Esri and imagery contributors',
             },
-            'place-columns': {
-              type: 'geojson',
-              data: markerColumnData,
-            },
           },
           layers: [
             { id: 'ocean', type: 'background', paint: { 'background-color': '#071a2c' } },
             { id: 'satellite', type: 'raster', source: 'satellite' },
-            {
-              id: 'place-columns',
-              type: 'fill-extrusion',
-              source: 'place-columns',
-              paint: {
-                'fill-extrusion-color': '#ff2d78',
-                'fill-extrusion-height': ['get', 'height'],
-                'fill-extrusion-base': 0,
-                'fill-extrusion-opacity': 1,
-                'fill-extrusion-vertical-gradient': true,
-              },
-            },
           ],
           sky: {
             'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0],
@@ -967,6 +1191,7 @@
       map.touchZoomRotate.disableRotation();
 
       await map.once('load');
+      map.addLayer(spikeLayer);
 
       const totalStations = markers.reduce((total, place) => total + (Number(place.size) || 0), 0);
       $('#globe-stats').textContent = `${markers.length.toLocaleString()} places · ${totalStations.toLocaleString()} stations`;
@@ -992,112 +1217,31 @@
       container.addEventListener('pointerdown', stopAutoRotate);
       map.on('wheel', stopAutoRotate);
 
-      function placeFromFeature(feature) {
-        return feature ? byId.get(feature.properties.id) : null;
-      }
-      function frontFacingDot(place) {
-        const center = map.getCenter();
-        const centerLatitude = center.lat * Math.PI / 180;
-        const placeLatitude = Number(place.geo[1]) * Math.PI / 180;
-        const longitudeDelta = (Number(place.geo[0]) - center.lng) * Math.PI / 180;
-        return Math.sin(centerLatitude) * Math.sin(placeLatitude)
-          + Math.cos(centerLatitude) * Math.cos(placeLatitude) * Math.cos(longitudeDelta);
-      }
-      // MapLibre only hit-tests the ground footprint of fill-extrusions, so a
-      // click high on a column would miss. Instead, approximate each nearby
-      // column as a screen-space segment from its base toward the globe's rim
-      // and test the pointer against that segment.
-      function placeNear(point) {
-        if (!map.getLayer('place-columns')) return null;
-        const canvas = map.getCanvas();
-        const center = map.getCenter();
-        const centerScreen = map.project(center);
-        const metersPerPixel = 40075016.686 * Math.cos(center.lat * Math.PI / 180)
-          / (512 * Math.pow(2, map.getZoom()));
-        const maxColumnPixels = Math.min(
-          Math.hypot(canvas.clientWidth || canvas.width, canvas.clientHeight || canvas.height),
-          400000 / metersPerPixel,
-        ) + 30;
-        let towardCenterX = centerScreen.x - point.x;
-        let towardCenterY = centerScreen.y - point.y;
-        const towardCenterLength = Math.hypot(towardCenterX, towardCenterY);
-        if (towardCenterLength > 1) {
-          towardCenterX = towardCenterX / towardCenterLength * maxColumnPixels;
-          towardCenterY = towardCenterY / towardCenterLength * maxColumnPixels;
-        } else {
-          towardCenterX = 0;
-          towardCenterY = maxColumnPixels;
-        }
-        const pad = 14;
-        const candidates = map.queryRenderedFeatures([
-          [Math.min(point.x, point.x + towardCenterX) - pad, Math.min(point.y, point.y + towardCenterY) - pad],
-          [Math.max(point.x, point.x + towardCenterX) + pad, Math.max(point.y, point.y + towardCenterY) + pad],
-        ], { layers: ['place-columns'] });
-        const pitchRadians = map.getPitch() * Math.PI / 180;
-        const seen = new Set();
-        let nearestPlace = null;
-        let nearestDistance = Infinity;
-        candidates.forEach((feature) => {
-          const place = placeFromFeature(feature);
-          if (!place || seen.has(place.id) || !Array.isArray(place.geo)) return;
-          seen.add(place.id);
-          const facing = frontFacingDot(place);
-          if (facing <= 0) return;
-          const base = map.project(place.geo);
-          if (!Number.isFinite(base.x) || !Number.isFinite(base.y)) return;
-          let directionX = base.x - centerScreen.x;
-          let directionY = base.y - centerScreen.y;
-          const directionLength = Math.hypot(directionX, directionY);
-          if (directionLength > 24) {
-            directionX /= directionLength;
-            directionY /= directionLength;
-          } else {
-            directionX = 0;
-            directionY = -1;
-          }
-          const sinTheta = Math.sqrt(Math.max(0, 1 - facing * facing));
-          const tilt = Math.max(0.15, sinTheta * Math.cos(pitchRadians) + facing * Math.sin(pitchRadians));
-          const lengthPixels = columnHeightMeters(place) / metersPerPixel * tilt;
-          const segmentX = directionX * lengthPixels;
-          const segmentY = directionY * lengthPixels;
-          const segmentLengthSquared = segmentX * segmentX + segmentY * segmentY;
-          let along = 0;
-          if (segmentLengthSquared > 0) {
-            along = ((point.x - base.x) * segmentX + (point.y - base.y) * segmentY) / segmentLengthSquared;
-            along = Math.max(0, Math.min(1, along));
-          }
-          const closestX = base.x + segmentX * along;
-          const closestY = base.y + segmentY * along;
-          const distance = Math.hypot(point.x - closestX, point.y - closestY);
-          const tolerance = Math.max(9, columnRadiusMeters(place) / metersPerPixel + 4);
-          if (distance > tolerance || distance >= nearestDistance) return;
-          nearestPlace = place;
-          nearestDistance = distance;
-        });
-        return nearestPlace;
-      }
       map.on('mousemove', (event) => {
-        const place = placeNear(event.point);
-        map.getCanvas().style.cursor = place ? 'pointer' : '';
-        if (!place) {
-          tooltip.classList.add('hidden');
-          return;
-        }
-        tooltip.textContent = `${place.title}, ${place.country} · ${place.size} station${place.size === 1 ? '' : 's'}`;
-        tooltip.style.left = `${event.point.x + 14}px`;
-        tooltip.style.top = `${event.point.y - 10}px`;
-        tooltip.classList.remove('hidden');
+        const point = event.point;
+        spikeLayer.pick(point, (place) => {
+          map.getCanvas().style.cursor = place ? 'pointer' : '';
+          if (!place) {
+            tooltip.classList.add('hidden');
+            return;
+          }
+          tooltip.textContent = `${place.title}, ${place.country} · ${place.size} station${place.size === 1 ? '' : 's'}`;
+          tooltip.style.left = `${point.x + 14}px`;
+          tooltip.style.top = `${point.y - 10}px`;
+          tooltip.classList.remove('hidden');
+        });
       });
       map.on('mouseout', () => {
         map.getCanvas().style.cursor = '';
         tooltip.classList.add('hidden');
       });
       map.on('click', (event) => {
-        const place = placeNear(event.point);
-        if (!place) return;
-        showPlaceStations(place, stationsEl, 'Back to Globe', () => {
-          stationsEl.classList.add('hidden');
-        }, { scroll: true });
+        spikeLayer.pick(event.point, (place) => {
+          if (!place) return;
+          showPlaceStations(place, stationsEl, 'Back to Globe', () => {
+            stationsEl.classList.add('hidden');
+          }, { scroll: true });
+        });
       });
 
       await Promise.race([
