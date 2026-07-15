@@ -861,9 +861,17 @@ input[type="text"] {
 }
 
 /* ===== Globe View ===== */
+#view-globe.active {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 #globe-wrap {
   position: relative;
-  height: min(70vh, 640px);
+  /* Fill the content area (shrinks automatically when the player bar shows) */
+  flex: 1;
+  min-height: 320px;
   background: radial-gradient(ellipse at 50% 120%, #141430 0%, var(--bg-primary) 70%);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
