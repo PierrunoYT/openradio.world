@@ -985,13 +985,37 @@
       function placeFromFeature(feature) {
         return feature ? byId.get(feature.properties.id) : null;
       }
+      function isFrontFacing(place) {
+        const center = map.getCenter();
+        const centerLatitude = center.lat * Math.PI / 180;
+        const placeLatitude = Number(place.geo[1]) * Math.PI / 180;
+        const longitudeDelta = (Number(place.geo[0]) - center.lng) * Math.PI / 180;
+        return Math.sin(centerLatitude) * Math.sin(placeLatitude)
+          + Math.cos(centerLatitude) * Math.cos(placeLatitude) * Math.cos(longitudeDelta) > 0;
+      }
       function featureNear(point) {
         if (!map.getLayer('places')) return null;
         const hitRadius = 12;
-        return map.queryRenderedFeatures([
+        const hitRadiusSquared = hitRadius * hitRadius;
+        const candidates = map.queryRenderedFeatures([
           [point.x - hitRadius, point.y - hitRadius],
           [point.x + hitRadius, point.y + hitRadius],
-        ], { layers: ['places'] })[0] || null;
+        ], { layers: ['places'] });
+        let nearestFeature = null;
+        let nearestDistance = Infinity;
+        candidates.forEach((feature) => {
+          const place = placeFromFeature(feature);
+          if (!place || !Array.isArray(place.geo) || !isFrontFacing(place)) return;
+          const projected = map.project(place.geo);
+          if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) return;
+          const xDistance = projected.x - point.x;
+          const yDistance = projected.y - point.y;
+          const distance = xDistance * xDistance + yDistance * yDistance;
+          if (distance > hitRadiusSquared || distance >= nearestDistance) return;
+          nearestFeature = feature;
+          nearestDistance = distance;
+        });
+        return nearestFeature;
       }
       map.on('mousemove', (event) => {
         const feature = featureNear(event.point);

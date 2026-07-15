@@ -52,6 +52,9 @@ rather than by version number. Newest first.
 
 - **Reliable marker startup** — the place source and marker layers are loaded
   with the initial MapLibre style, preventing missing-layer interaction errors.
+- **Globe-only marker picking** — hover and click candidates must be on the
+  visible hemisphere and within 12 screen pixels of their exact projected
+  coordinates, preventing location tooltips from appearing outside the globe.
 - **Smaller place circles** — marker and glow radii are half their previous
   size, reducing overlap without shrinking their forgiving interaction area.
 - **Smooth station loading** — selecting a place now paints a dedicated loading
