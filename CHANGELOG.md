@@ -8,6 +8,11 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Opening an active station on the globe no longer interrupts playback** —
+  the globe button now preserves an already-playing or loading stream while it
+  navigates to the marked location and side panel. Choosing a different or
+  stopped station still starts that station normally.
+
 - **Globe markers now stop at the horizon** — the custom station-marker shader
   now uses MapLibre's globe-aware `projectTile` path, which clips points on the
   far hemisphere before drawing their billboards. Stations behind the Earth no

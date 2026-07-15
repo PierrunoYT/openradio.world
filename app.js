@@ -1966,10 +1966,13 @@ void main() {
 
         currentList = playableList;
         currentIndex = playableList.findIndex((s) => s.id === station.id);
-        playStation(station);
 
         const globeButton = e.target.closest('.btn-globe');
         if (globeButton) {
+          // Navigating an already-playing station must not reload its stream.
+          if (!currentStation || currentStation.id !== station.id || (!isPlaying && !isLoading)) {
+            playStation(station);
+          }
           globeButton.disabled = true;
           globeButton.setAttribute('aria-busy', 'true');
           showStationOnGlobe(station)
@@ -1984,6 +1987,7 @@ void main() {
           return;
         }
 
+        playStation(station);
         if (options.onSelect) options.onSelect(station);
       });
 
