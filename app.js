@@ -696,8 +696,7 @@
       if (hit) {
         showPlaceStations(hit, stationsEl, 'Back to Globe', () => {
           stationsEl.classList.add('hidden');
-        });
-        stationsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, { scroll: true });
       }
     });
 
@@ -1016,8 +1015,7 @@
         if (!place) return;
         showPlaceStations(place, stationsEl, 'Back to Globe', () => {
           stationsEl.classList.add('hidden');
-        });
-        stationsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, { scroll: true });
       });
 
       await Promise.race([
@@ -1104,37 +1102,103 @@
   }
 
   // ===== Shared: station list for a place =====
-  async function showPlaceStations(place, stationsEl, backLabel, onBack) {
-    stationsEl.classList.remove('hidden');
+  const placeStationRequests = new WeakMap();
+
+  async function showPlaceStations(place, stationsEl, backLabel, onBack, options = {}) {
+    const requestToken = {};
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    placeStationRequests.set(stationsEl, requestToken);
+    stationsEl.classList.remove('hidden', 'is-ready', 'is-visible');
+    stationsEl.classList.add('place-stations-panel', 'is-loading');
+    stationsEl.setAttribute('aria-busy', 'true');
     stationsEl.innerHTML = `
-      <div style="grid-column: 1/-1">
+      <div class="place-stations-header">
         <button class="back-btn">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
           ${escapeHtml(backLabel)}
         </button>
         <h3 class="section-title">${escapeHtml(place.title)}, ${escapeHtml(place.country)}</h3>
       </div>
-      <div class="loading-placeholder" style="grid-column:1/-1"><div class="loader"></div></div>`;
+      <div class="place-stations-stage">
+        <div class="place-stations-loading" role="status" aria-live="polite">
+          <div class="loader" aria-hidden="true"></div>
+          <p>Loading radio stations…</p>
+          <span>Finding stations in ${escapeHtml(place.title)}</span>
+        </div>
+        <div class="place-stations-results" aria-live="polite"></div>
+      </div>`;
 
-    stationsEl.querySelector('.back-btn').addEventListener('click', onBack);
+    stationsEl.querySelector('.back-btn').addEventListener('click', () => {
+      const closeToken = {};
+      placeStationRequests.set(stationsEl, closeToken);
+      stationsEl.classList.remove('is-visible');
+
+      const finishClose = () => {
+        if (placeStationRequests.get(stationsEl) !== closeToken) return;
+        stationsEl.classList.add('hidden');
+        stationsEl.classList.remove('place-stations-panel', 'is-loading', 'is-ready');
+        stationsEl.removeAttribute('aria-busy');
+        stationsEl.innerHTML = '';
+        onBack();
+      };
+
+      if (reducedMotion) finishClose();
+      else setTimeout(finishClose, 240);
+    });
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (placeStationRequests.get(stationsEl) !== requestToken) return;
+        stationsEl.classList.add('is-visible');
+        if (options.scroll) {
+          stationsEl.scrollIntoView({
+            behavior: reducedMotion ? 'auto' : 'smooth',
+            block: 'start',
+          });
+        }
+      });
+    });
+
+    const revealResults = () => {
+      stationsEl.setAttribute('aria-busy', 'false');
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (placeStationRequests.get(stationsEl) !== requestToken) return;
+          stationsEl.classList.remove('is-loading');
+          stationsEl.classList.add('is-ready');
+        });
+      });
+    };
 
     try {
-      const stations = await getPlaceStations(place.id);
-      const header = stationsEl.querySelector('div:first-child');
-      stationsEl.innerHTML = '';
-      if (header) stationsEl.appendChild(header);
+      const [stations] = await Promise.all([
+        getPlaceStations(place.id),
+        new Promise((resolve) => setTimeout(resolve, reducedMotion ? 0 : 320)),
+      ]);
+      if (placeStationRequests.get(stationsEl) !== requestToken) return;
+
+      const results = stationsEl.querySelector('.place-stations-results');
 
       if (stations.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'empty-state';
         empty.innerHTML = '<p>No stations in this place</p>';
-        stationsEl.appendChild(empty);
+        results.appendChild(empty);
       } else {
-        appendStationCards(stationsEl, stations);
+        appendStationCards(results, stations);
       }
+
+      revealResults();
     } catch (err) {
+      if (placeStationRequests.get(stationsEl) !== requestToken) return;
       console.error('Failed to load place stations:', err);
-      showError(stationsEl.id, 'Failed to load stations. Please try again.');
+      const results = stationsEl.querySelector('.place-stations-results');
+      results.innerHTML = `
+        <div class="empty-state">
+          <p>Failed to load stations. Please try again.</p>
+          <span>Check your internet connection and try again</span>
+        </div>`;
+      revealResults();
     }
   }
 

@@ -312,6 +312,90 @@ input[type="text"] {
   gap: 12px;
 }
 
+.place-stations-panel {
+  opacity: 0;
+  transform: translateY(16px);
+  scroll-margin-top: 12px;
+  transition: opacity 0.24s ease, transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.place-stations-panel.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.place-stations-header,
+.place-stations-stage {
+  grid-column: 1 / -1;
+}
+
+.place-stations-stage {
+  position: relative;
+  display: grid;
+}
+
+.place-stations-loading,
+.place-stations-results {
+  grid-area: 1 / 1;
+}
+
+.place-stations-loading {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: radial-gradient(circle at center, var(--accent-glow), transparent 68%), var(--bg-secondary);
+  color: var(--text-secondary);
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0s;
+}
+
+.place-stations-loading p {
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.place-stations-loading span {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.place-stations-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: opacity 0.24s ease, transform 0.24s ease, visibility 0s linear 0.24s;
+}
+
+.place-stations-panel.is-ready .place-stations-loading {
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.985);
+  transition-delay: 0s, 0s, 0.2s;
+}
+
+.place-stations-panel.is-ready .place-stations-results {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition-delay: 0.06s, 0.06s, 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .place-stations-panel,
+  .place-stations-loading,
+  .place-stations-results {
+    transition: none;
+  }
+}
+
 .station-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -832,6 +916,10 @@ input[type="text"] {
   }
 
   .stations-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .place-stations-results {
     grid-template-columns: 1fr;
   }
 

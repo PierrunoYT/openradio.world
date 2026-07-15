@@ -54,6 +54,9 @@ rather than by version number. Newest first.
   with the initial MapLibre style, preventing missing-layer interaction errors.
 - **Smaller place circles** — marker and glow radii are half their previous
   size, reducing overlap without shrinking their forgiving interaction area.
+- **Smooth station loading** — selecting a place now paints a dedicated loading
+  panel before scrolling, then crossfades the completed station grid into view
+  instead of replacing the globe results abruptly.
 
 ### Added
 
