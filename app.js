@@ -872,7 +872,7 @@
         const longitude = Number(place.geo[0]);
         const latitude = Number(place.geo[1]);
         const stationWeight = Math.log1p(Number(place.size) || 0);
-        const radiusMeters = 1800 + Math.min(1400, stationWeight * 250);
+        const radiusMeters = 2800 + Math.min(2200, stationWeight * 400);
         const angularRadius = radiusMeters / earthRadiusMeters;
         const latitudeRadians = latitude * Math.PI / 180;
         const longitudeRadians = longitude * Math.PI / 180;
@@ -915,7 +915,7 @@
           id: place.id,
           properties: {
             id: place.id,
-            height: Math.round(6500 + Math.min(15500, Math.log1p(Number(place.size) || 0) * 2600)),
+            height: Math.round(12000 + Math.min(26000, Math.log1p(Number(place.size) || 0) * 4400)),
           },
           geometry: { type: 'Polygon', coordinates: [markerColumnRing(place)] },
         })),

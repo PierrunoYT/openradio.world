@@ -33,9 +33,9 @@ rather than by version number. Newest first.
   MapLibre GeoJSON circle layers with compact station-weighted sizes, a bright
   outline, and a soft glow that remains legible over satellite imagery.
 - **Extruded marker columns** — every place now has a slim octagonal MapLibre
-  fill extrusion rising above the globe, with shaded walls and restrained,
-  station-weighted height. Ground circles fade while columns are prominent and
-  return at extreme zoom, keeping the map clean and interaction precise.
+  fill extrusion rising clearly above the globe, with shaded walls and
+  station-weighted height. Balanced footprints keep them prominent without
+  returning to the oversized block look, while ground circles fade cleanly.
 - **Forgiving marker interaction** — rendered-feature picking uses a 12-pixel
   tolerance around the pointer, making even small and densely packed places
   easier to hover and select while remaining aligned with the globe.
