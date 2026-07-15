@@ -33,7 +33,7 @@ OpenRadio ships continuously — every push to `main` deploys. See the
 - **Keyboard Shortcuts** — Navigate and control playback without touching the mouse
 - **Responsive Design** — Works on desktop, tablet, and mobile, including safe-area support for notched phones
 - **Installable PWA** — Web app manifest with full icon set, so it can be added to your home screen or dock
-- **Dark Theme** — Modern dark UI with Inter typography, purple accents, and animated equalizer
+- **Night-Broadcast Theme** — Deep ink-navy dark UI with a warm amber "dial glow" accent, Space Grotesk + Inter typography, and a live-green animated equalizer that matches the globe's city dots
 - **No Build Step** — Plain HTML, CSS, and JavaScript; MapLibre loads from a pinned CDN release
 - **Stream Retry Logic** — Automatic retries when a stream fails to start
 

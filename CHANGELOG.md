@@ -8,6 +8,22 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Complete visual redesign — the "Night Broadcast" theme** — the whole UI
+  was rebuilt from scratch around a new design system. The purple
+  Spotify-style look is gone; in its place: a deep ink-navy night sky, a
+  warm amber "dial glow" primary accent, and live-signal green reserved
+  for anything that is on air (the playing card's ring and equalizer now
+  match the globe's green city dots). Headings, the logo, and station
+  names use Space Grotesk alongside Inter for UI text. The player bar is
+  now a floating broadcast dock with an amber play button, nav items get
+  an amber tick and glow when active, section titles carry a dial-tick
+  marker, and the sidebar footer sports a tuning-dial frequency ruler.
+  The brand followed along: `assets/icon.svg`, every PNG icon (favicon,
+  Apple touch, PWA set including the maskable variant), and the Open
+  Graph link-preview image were re-rendered in the amber-on-navy style,
+  and the browser/PWA theme color moved to the new background. All
+  behavior, layout breakpoints, keyboard shortcuts, and safe-area
+  handling are unchanged — this is a pure reskin, `app.js` untouched.
 - **Globe opens big, like Radio Garden** — the globe view no longer starts
   as a small distant marble. The starting zoom is now computed from the
   container size so the planet spans about 95% of the shorter edge of the
