@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — OpenRadio</title>
+  <meta name="description" content="Privacy Policy for OpenRadio: no accounts, no tracking, no ads. Favorites are stored only in your browser's localStorage." />
+  <link rel="canonical" href="https://openradio.world/privacy.html" />
+  <meta name="theme-color" content="#07090e" />
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="legal.css?v=1" />
+</head>
+<body>
+  <header class="legal-topbar">
+    <a class="brand" href="/">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <g stroke="#f6a83c" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="2" fill="#f6a83c" stroke="none"/>
+          <path d="M16.24 7.76a6 6 0 0 1 0 8.49"/>
+          <path d="M7.76 16.25a6 6 0 0 1 0-8.49"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+          <path d="M4.93 19.07a10 10 0 0 1 0-14.14"/>
+        </g>
+      </svg>
+      OpenRadio
+    </a>
+    <a class="back-link" href="/">&larr; Back to the app</a>
+  </header>
+
+  <main class="legal-wrap">
+    <h1>Privacy Policy</h1>
+    <p class="legal-updated">Last updated 2026-07-15</p>
+
+    <p>OpenRadio is built to work with <strong>no accounts, no ads, and no
+    tracking</strong>. This page explains exactly what little data touches
+    the app, and where it goes.</p>
+
+    <h2>Data stored in your browser</h2>
+    <p>OpenRadio saves your favorite stations, volume level, and a few UI
+    preferences in your browser's <strong>localStorage</strong>. This data:</p>
+    <ul>
+      <li>Never leaves your device or gets sent to any OpenRadio server</li>
+      <li>Is not accessible to us, to Radio Garden, or to any third party</li>
+      <li>Persists only on the device and browser you used, until you clear
+      your browser storage or uninstall the app</li>
+    </ul>
+    <p>OpenRadio does not use cookies, analytics scripts, or advertising
+    trackers.</p>
+
+    <h2>Requests that pass through our servers</h2>
+    <p>OpenRadio is hosted on Cloudflare Pages. To let the app work over
+    HTTPS, a restricted same-origin Cloudflare Pages Function proxies a small,
+    fixed set of Radio Garden JSON endpoints and audio streams that would
+    otherwise trigger mixed-content or CORS blocks in your browser. These
+    requests necessarily pass through Cloudflare's network, which may log
+    standard technical data (such as IP address and request timing) as part
+    of normal infrastructure operation, governed by
+    <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">Cloudflare's privacy policy</a>.
+    OpenRadio itself does not read, store, or analyze this traffic.</p>
+
+    <h2>Third-party stream servers</h2>
+    <p>When you play a station, your device (or the proxy acting on your
+    behalf) connects directly to that station's own streaming server, which is
+    operated independently by the broadcaster. That connection is subject to
+    the broadcaster's own privacy practices, not OpenRadio's.</p>
+
+    <h2>No accounts</h2>
+    <p>OpenRadio has no sign-up, login, email collection, or user accounts of
+    any kind. There is nothing to register and nothing tied to your identity.</p>
+
+    <h2>Children's privacy</h2>
+    <p>OpenRadio does not knowingly collect any personal information from
+    anyone, including children, because it does not collect personal
+    information at all.</p>
+
+    <h2>Changes to this policy</h2>
+    <p>If this policy changes, the "Last updated" date above will change too.
+    Since OpenRadio ships continuously, check the
+    <a href="https://github.com/PierrunoYT/openradio.world/blob/main/CHANGELOG.md" target="_blank" rel="noopener">changelog</a>
+    for a dated history of app changes.</p>
+
+    <div class="legal-note">
+      <p>Questions about privacy? Open an issue on
+      <a href="https://github.com/PierrunoYT/openradio.world/issues" target="_blank" rel="noopener">GitHub Issues</a>.</p>
+    </div>
+  </main>
+
+  <nav class="legal-footer-nav" aria-label="Legal pages">
+    <a href="/">Home</a>
+    <a href="/privacy.html">Privacy Policy</a>
+    <a href="/terms.html">Terms of Use</a>
+    <a href="/disclaimer.html">Disclaimer</a>
+    <a href="https://github.com/PierrunoYT/openradio.world" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</body>
+</html>

@@ -8,6 +8,12 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Added Privacy Policy, Terms of Use, and Disclaimer pages** — three new
+  standalone legal pages (`privacy.html`, `terms.html`, `disclaimer.html`)
+  covering data handling (localStorage only, no accounts/tracking), acceptable
+  use, and the third-party/unofficial-API nature of the station directory and
+  streams. Linked from the sidebar footer and added to `sitemap.xml`.
+
 - **The player now has a sound-reactive three-line waveform** — low, mid, and
   high frequency energy from the live stream drives three colored waves in the
   playback bar. Production audio now uses the existing restricted same-origin

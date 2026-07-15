@@ -296,6 +296,28 @@ input[type="text"] {
   color: var(--amber-hi);
 }
 
+.sidebar-legal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.sidebar-legal a {
+  color: var(--text-low);
+  text-decoration: none;
+  transition: color var(--transition);
+}
+
+.sidebar-legal a:hover {
+  color: var(--amber-hi);
+}
+
+.sidebar-legal span {
+  color: var(--text-low);
+}
+
 .version {
   margin-top: 2px;
   color: var(--text-low);
