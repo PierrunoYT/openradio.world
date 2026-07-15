@@ -8,6 +8,11 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Discover can be refreshed in place** — a new Refresh button rerolls the
+  featured cities and stations without requiring another sidebar click or a
+  full page reload. The control shows its loading state and prevents duplicate
+  refreshes while station data is being fetched.
+
 - **Station browser now stays beside the selected place** — choosing a city
   from globe search or by clicking a marker now zooms to a city-level view
   and opens its stations in a dedicated, independently scrollable side panel

@@ -64,6 +64,7 @@
   const sidebarToggle = $('#sidebar-toggle');
   const sidebar = $('#sidebar');
   const favCountBadge = $('#fav-count');
+  const discoverRefresh = $('#discover-refresh');
 
   // ===== Initialize =====
   function init() {
@@ -301,6 +302,7 @@
     viewTitle.textContent = config.title;
     viewTitle.classList.toggle('hidden', config.showSearch);
     searchBar.classList.toggle('hidden', !config.showSearch);
+    discoverRefresh.classList.toggle('hidden', view !== 'discover');
 
     if (config.showSearch) {
       searchInput.focus();
@@ -332,10 +334,16 @@
 
   // ===== Discover View =====
   let discoverLoaded = false;
+  let discoverLoading = false;
 
-  async function loadDiscover() {
-    if (discoverLoaded) return;
+  async function loadDiscover(force = false) {
+    if (discoverLoading || (discoverLoaded && !force)) return;
+    discoverLoading = true;
+    discoverRefresh.disabled = true;
+    discoverRefresh.setAttribute('aria-busy', 'true');
+
     const container = $('#discover-sections');
+    container.innerHTML = '<div class="loading-placeholder"><div class="loader"></div></div>';
 
     try {
       const places = await getPlaces();
@@ -345,7 +353,7 @@
 
       container.innerHTML = '';
 
-      picks.forEach((place) => {
+      await Promise.all(picks.map(async (place) => {
         const block = document.createElement('div');
         block.className = 'section-block';
         block.innerHTML = `
@@ -354,26 +362,29 @@
         container.appendChild(block);
 
         const grid = block.querySelector('.stations-grid');
-        getPlaceStations(place.id)
-          .then((stations) => {
-            grid.classList.remove('loading-placeholder');
-            grid.innerHTML = '';
-            appendStationCards(grid, stations.slice(0, DISCOVER_LIMIT), stations);
-          })
-          .catch(() => {
-            grid.classList.remove('loading-placeholder');
-            grid.innerHTML = '<div class="empty-state"><p>Failed to load stations</p></div>';
-          });
-      });
+        try {
+          const stations = await getPlaceStations(place.id);
+          grid.classList.remove('loading-placeholder');
+          grid.innerHTML = '';
+          appendStationCards(grid, stations.slice(0, DISCOVER_LIMIT), stations);
+        } catch {
+          grid.classList.remove('loading-placeholder');
+          grid.innerHTML = '<div class="empty-state"><p>Failed to load stations</p></div>';
+        }
+      }));
 
       discoverLoaded = true;
     } catch (err) {
       console.error('Failed to load discover:', err);
       container.innerHTML = `
         <div class="empty-state">
-          <p>Failed to load stations. Please refresh.</p>
+          <p>Failed to load stations. Use Refresh to try again.</p>
           <span>Check your internet connection and try again</span>
         </div>`;
+    } finally {
+      discoverLoading = false;
+      discoverRefresh.disabled = false;
+      discoverRefresh.removeAttribute('aria-busy');
     }
   }
 
@@ -2194,6 +2205,8 @@ void main() {
     $$('.nav-btn').forEach((btn) => {
       btn.addEventListener('click', () => navigateTo(btn.dataset.view));
     });
+
+    discoverRefresh.addEventListener('click', () => loadDiscover(true));
 
     btnPlay.addEventListener('click', togglePlayPause);
     btnPrev.addEventListener('click', playPrev);
