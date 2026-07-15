@@ -16,7 +16,8 @@ commit order rather than by version number. Newest change first.
   instead of losing the selected location. Smaller screens retain the stacked
   station flow, and the panel shows a loading indicator while stations are
   fetched. Clicking a station zooms further into its associated city marker
-  while starting playback.
+  while starting playback, and a thin high-contrast ring marks that location
+  as selected.
 - **Find a place on the globe** — the globe was drag/scroll-only with no
   way to jump straight to a country or city, so locating a specific place
   meant manually spinning and zooming. A search box in the globe's

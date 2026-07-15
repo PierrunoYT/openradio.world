@@ -1208,6 +1208,36 @@ void main() {
       await map.once('load');
       map.addLayer(markerLayer);
 
+      // A separate MapLibre circle keeps the selected location unmistakable
+      // without changing the appearance or pick area of the WebGL dot layer.
+      const selectedPlaceSourceId = 'selected-place';
+      map.addSource(selectedPlaceSourceId, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+      map.addLayer({
+        id: 'selected-place-ring',
+        type: 'circle',
+        source: selectedPlaceSourceId,
+        paint: {
+          'circle-radius': 10,
+          'circle-color': 'rgba(0, 0, 0, 0)',
+          'circle-stroke-color': 'rgba(232, 238, 250, 0.95)',
+          'circle-stroke-width': 1.25,
+        },
+      });
+      const selectPlaceMarker = (place) => {
+        const features = place ? [{
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'Point', coordinates: place.geo },
+        }] : [];
+        map.getSource(selectedPlaceSourceId).setData({
+          type: 'FeatureCollection',
+          features,
+        });
+      };
+
       const totalStations = markers.reduce((total, place) => total + (Number(place.size) || 0), 0);
       $('#globe-stats').textContent = `${markers.length.toLocaleString()} places · ${totalStations.toLocaleString()} stations`;
 
@@ -1289,6 +1319,7 @@ void main() {
       };
 
       const openPlaceStations = (place) => {
+        selectPlaceMarker(null);
         globeView.classList.add('has-stations');
         stationsEl.classList.remove('hidden');
         stationsEl.innerHTML = '<div class="loading-placeholder"><div class="loader" aria-label="Loading stations"></div></div>';
@@ -1300,10 +1331,13 @@ void main() {
           focusPlace(place, { duration: 500 });
         }, {
           scroll: stationPanelIsStacked(),
-          onStationSelect: () => focusPlace(place, {
-            duration: 700,
-            zoom: Math.max(8, Math.min(10, map.getZoom())),
-          }),
+          onStationSelect: () => {
+            selectPlaceMarker(place);
+            focusPlace(place, {
+              duration: 700,
+              zoom: Math.max(8, Math.min(10, map.getZoom())),
+            });
+          },
         });
       };
 
