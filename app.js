@@ -1273,13 +1273,15 @@ void main() {
       // Keep the chosen city framed while the station browser opens beside the
       // globe. Resizing first matters on desktop because the side panel changes
       // the map's viewport width.
-      const focusPlace = (place, duration = 900) => {
+      const focusPlace = (place, options = {}) => {
+        const duration = options.duration ?? 900;
+        const zoom = options.zoom ?? Math.max(5, Math.min(7, map.getZoom()));
         stopAutoRotate();
         requestAnimationFrame(() => {
           map.resize();
           map.flyTo({
             center: place.geo,
-            zoom: Math.max(5, Math.min(7, map.getZoom())),
+            zoom,
             pitch: 20,
             duration,
           });
@@ -1295,8 +1297,14 @@ void main() {
           globeView.classList.remove('has-stations');
           // Once the map expands again, resize and re-center it on the city the
           // listener just browsed instead of returning to a generic globe view.
-          focusPlace(place, 500);
-        }, { scroll: stationPanelIsStacked() });
+          focusPlace(place, { duration: 500 });
+        }, {
+          scroll: stationPanelIsStacked(),
+          onStationSelect: () => focusPlace(place, {
+            duration: 700,
+            zoom: Math.max(8, Math.min(10, map.getZoom())),
+          }),
+        });
       };
 
       map.on('click', (event) => {
@@ -1545,7 +1553,9 @@ void main() {
       empty.innerHTML = '<p>No stations in this place</p>';
       results.appendChild(empty);
     } else {
-      appendStationCards(results, stations);
+      appendStationCards(results, stations, undefined, {
+        onSelect: options.onStationSelect,
+      });
     }
     stationsEl.setAttribute('aria-busy', 'false');
 
@@ -1820,7 +1830,7 @@ void main() {
   }
 
   // ===== Render Station Cards =====
-  function appendStationCards(container, stations, fullList) {
+  function appendStationCards(container, stations, fullList, options = {}) {
     const frag = document.createDocumentFragment();
     // fullList is the complete list (for prev/next beyond what's rendered)
     const playableList = fullList || stations;
@@ -1865,6 +1875,7 @@ void main() {
         currentIndex = playableList.findIndex((s) => s.id === station.id);
 
         playStation(station);
+        if (options.onSelect) options.onSelect(station);
       });
 
       frag.appendChild(card);

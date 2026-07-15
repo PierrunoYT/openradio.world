@@ -15,7 +15,8 @@ commit order rather than by version number. Newest change first.
   **Back to Globe** expands the map again and re-centers it on the same city
   instead of losing the selected location. Smaller screens retain the stacked
   station flow, and the panel shows a loading indicator while stations are
-  fetched.
+  fetched. Clicking a station zooms further into its associated city marker
+  while starting playback.
 - **Find a place on the globe** — the globe was drag/scroll-only with no
   way to jump straight to a country or city, so locating a specific place
   meant manually spinning and zooming. A search box in the globe's
