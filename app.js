@@ -887,6 +887,8 @@
         bearing: 0,
         attributionControl: false,
         doubleClickZoom: false,
+        scrollZoom: false,
+        reduceMotion: true,
         pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
         style: {
           version: 8,
@@ -963,7 +965,6 @@
         rotateFrame = 0;
       };
       container.addEventListener('pointerdown', stopAutoRotate);
-      container.addEventListener('wheel', stopAutoRotate, { passive: true });
 
       function placeFromFeature(feature) {
         return feature ? byId.get(feature.properties.id) : null;
@@ -1010,8 +1011,16 @@
 
       function zoomBy(delta) {
         stopAutoRotate();
-        map.easeTo({ zoom: Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), map.getZoom() + delta)), duration: 250 });
+        map.stop();
+        map.jumpTo({ zoom: Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), map.getZoom() + delta)) });
       }
+      container.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        if (!event.deltaY) return;
+        const modeScale = event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? container.clientHeight : 1;
+        const delta = Math.max(-0.5, Math.min(0.5, -event.deltaY * modeScale / 400));
+        zoomBy(delta);
+      }, { passive: false });
       $('#globe-zoom-in').addEventListener('click', () => zoomBy(1));
       $('#globe-zoom-out').addEventListener('click', () => zoomBy(-1));
 

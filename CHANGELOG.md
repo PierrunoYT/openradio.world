@@ -15,18 +15,28 @@ rather than by version number. Newest first.
 - **High-resolution satellite Earth** — Esri World Imagery is loaded as a
   level-of-detail tile pyramid up to level 19, so finer imagery streams in as
   the camera approaches instead of stretching one global image.
-- **Radio Garden-style place markers** — all 12,326 places are rendered in a
-  native MapLibre GeoJSON circle layer with station-weighted sizes.
-- **Accurate interaction** — markers and Earth share MapLibre's projection,
-  so native rendered-feature picking stays aligned at every zoom.
+- **High-visibility place markers** — all 12,326 places are rendered in native
+  MapLibre GeoJSON circle layers with station-weighted sizes, a bright outline,
+  and a soft glow that remains legible over satellite imagery.
+- **Forgiving marker interaction** — rendered-feature picking uses a 12-pixel
+  tolerance around the pointer, making even small and densely packed places
+  easier to hover and select while remaining aligned with the globe.
 - **Synchronized loading** — the loader remains visible until initial imagery
   tiles and station points have rendered together.
-- **Expanded zoom range** — wheel, pinch, and button zoom use MapLibre levels
-  0 through 19, matching the available satellite imagery detail.
+- **Direct globe zoom** — wheel input applies proportional, center-anchored
+  zoom updates without MapLibre's built-in easing, while the buttons move one
+  level immediately. Zoom levels 0 through 19 match the satellite imagery.
+- **Readable attribution** — Esri imagery credits now use a high-contrast dark
+  control with light text and links.
 - **Lower background cost** — animation stops whenever another app view is
   open, and render resolution is capped on high-DPI screens.
 - **Faster first open** — MapLibre warms during browser idle time, while the
   globe still loads only the places snapshot rather than the station catalog.
+
+### Fixed
+
+- **Reliable marker startup** — the place source and marker layers are loaded
+  with the initial MapLibre style, preventing missing-layer interaction errors.
 
 ### Added
 
@@ -34,8 +44,7 @@ rather than by version number. Newest first.
   a new sidebar entry: drag to spin, scroll or use the +/−
   buttons to zoom, hover a city for its name and station count, click a
   city to list and play its stations. A live badge shows the loaded place and
-  station totals, featured cities render as larger dots, and the globe slowly
-  rotates until touched.
+  station totals, and the globe slowly rotates until touched.
 
 ---
 
