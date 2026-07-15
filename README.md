@@ -18,7 +18,7 @@ No accounts, no ads, no tracking. Just open and listen.
 
 - **Thousands of stations in 12,000+ cities** worldwide via the [Radio Garden](https://radio.garden/) API
 - **Discover** — Stations from a rotating selection of featured cities around the globe
-- **Globe** — An interactive 3D globe drawn from 12,000+ city dots; spin, zoom, and click a city to tune in
+- **Globe** — An interactive 3D globe with real satellite imagery (NASA Blue Marble); spin, zoom, and click a city to tune in
 - **Search** — Real-time search by station name or place
 - **Browse by Country** — Drill down from country to city to stations
 - **Browse by City** — Every city on the Radio Garden globe, sorted by station count

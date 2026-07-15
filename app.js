@@ -370,6 +370,83 @@
 
     const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent-light').trim() || '#a78bfa';
 
+    // Earth texture (NASA Blue Marble, equirectangular). Wrapped onto the
+    // sphere by per-pixel inverse projection; until it loads (or if it
+    // fails) the globe falls back to a shaded sphere with only the dots.
+    let texData = null;
+    let texW = 0;
+    let texH = 0;
+    const texImg = new Image();
+    texImg.onload = () => {
+      texW = 2048;
+      texH = 1024;
+      const tc = document.createElement('canvas');
+      tc.width = texW;
+      tc.height = texH;
+      const tctx = tc.getContext('2d');
+      tctx.drawImage(texImg, 0, 0, texW, texH);
+      texData = tctx.getImageData(0, 0, texW, texH).data;
+      dirty = true;
+    };
+    texImg.src = 'assets/earth.jpg';
+
+    const sphereCanvas = document.createElement('canvas');
+    const sphereCtx = sphereCanvas.getContext('2d');
+
+    function drawTexturedSphere(cx, cy, R) {
+      // Lower sampling resolution while moving, full quality at rest
+      const quality = dragging ? 0.45 : autoRotate ? 0.55 : 1;
+      const size = Math.ceil(2 * R);
+      const rw = Math.max(2, Math.round(size * quality));
+      if (sphereCanvas.width !== rw) {
+        sphereCanvas.width = rw;
+        sphereCanvas.height = rw;
+      }
+
+      const img = sphereCtx.createImageData(rw, rw);
+      const d = img.data;
+      const Rr = rw / 2;
+      const sinLat0 = Math.sin(lat0);
+      const cosLat0 = Math.cos(lat0);
+      const TWO_PI = Math.PI * 2;
+      const edge = 1 - 2.5 / Rr; // start of antialiased rim
+
+      let k = 0;
+      for (let j = 0; j < rw; j++) {
+        const y = (Rr - j - 0.5) / Rr;
+        for (let i = 0; i < rw; i++, k += 4) {
+          const x = (i + 0.5 - Rr) / Rr;
+          const r2 = x * x + y * y;
+          if (r2 > 1) continue; // outside the disc: stays transparent
+
+          const zv = Math.sqrt(1 - r2);
+          // Inverse orthographic: screen vector -> lat/lng
+          const sLat = y * cosLat0 + zv * sinLat0;
+          const lat = Math.asin(sLat > 1 ? 1 : sLat < -1 ? -1 : sLat);
+          const lng = lng0 + Math.atan2(x, zv * cosLat0 - y * sinLat0);
+
+          let u = lng / TWO_PI + 0.5;
+          u -= Math.floor(u);
+          const tx = (u * texW) | 0;
+          let ty = ((0.5 - lat / Math.PI) * texH) | 0;
+          if (ty >= texH) ty = texH - 1;
+          const ti = (ty * texW + tx) * 4;
+
+          const shade = 0.45 + 0.55 * zv; // day-side style shading
+          d[k] = texData[ti] * shade;
+          d[k + 1] = texData[ti + 1] * shade;
+          d[k + 2] = texData[ti + 2] * shade;
+
+          const r = Math.sqrt(r2);
+          d[k + 3] = r > edge ? 255 * ((1 - r) / (1 - edge)) : 255;
+        }
+      }
+
+      sphereCtx.putImageData(img, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(sphereCanvas, cx - size / 2, cy - size / 2, size, size);
+    }
+
     function render() {
       const cx = (W / 2) * dpr;
       const cy = (H / 2) * dpr;
@@ -377,15 +454,22 @@
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Sphere with subtle shading and rim glow
-      const grad = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
-      grad.addColorStop(0, 'rgba(120, 100, 200, 0.22)');
-      grad.addColorStop(0.7, 'rgba(60, 50, 110, 0.16)');
-      grad.addColorStop(1, 'rgba(30, 25, 60, 0.3)');
+      if (texData) {
+        drawTexturedSphere(cx, cy, R);
+      } else {
+        // Fallback: shaded sphere (texture not loaded yet or unavailable)
+        const grad = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
+        grad.addColorStop(0, 'rgba(120, 100, 200, 0.22)');
+        grad.addColorStop(0.7, 'rgba(60, 50, 110, 0.16)');
+        grad.addColorStop(1, 'rgba(30, 25, 60, 0.3)');
+        ctx.beginPath();
+        ctx.arc(cx, cy, R, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+
       ctx.beginPath();
       ctx.arc(cx, cy, R, 0, Math.PI * 2);
-      ctx.fillStyle = grad;
-      ctx.fill();
       ctx.strokeStyle = 'rgba(167, 139, 250, 0.35)';
       ctx.lineWidth = 1.5 * dpr;
       ctx.stroke();
@@ -481,6 +565,8 @@
       dragging = true;
       moved = 0;
       autoRotate = false;
+      hovered = -1;
+      tooltip.classList.add('hidden');
       lastX = e.clientX;
       lastY = e.clientY;
       canvas.setPointerCapture(e.pointerId);
@@ -523,6 +609,7 @@
 
     canvas.addEventListener('pointerup', (e) => {
       dragging = false;
+      dirty = true; // re-render at full quality
       canvas.style.cursor = 'grab';
       if (moved < 5) {
         const hit = hitTest(e.clientX, e.clientY);

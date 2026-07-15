@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- **Globe view** — an interactive 3D globe in the style of radio.garden, rendered dependency-free on a canvas: the 12,000+ city dots themselves draw the continents. Drag to spin, scroll or use buttons to zoom, hover for city names, click a city to list and play its stations. Featured cities appear as larger dots; the globe slowly rotates until touched.
+- **Globe view** — an interactive 3D globe in the style of radio.garden, rendered dependency-free on a canvas with real NASA Blue Marble satellite imagery texture-mapped onto the sphere (per-pixel inverse orthographic projection). The 12,000+ clickable city dots are drawn on top. Drag to spin, scroll or use buttons to zoom, hover for city names, click a city to list and play its stations. The globe slowly rotates until touched and drops to a lower sampling resolution while moving for smooth interaction.
 
 ---
 
