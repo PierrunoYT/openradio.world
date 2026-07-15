@@ -1,0 +1,31 @@
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Dependencies (if ever added)
+node_modules/
+package-lock.json
+
+# Build output (if ever added)
+dist/
+build/
+out/
+
+# Environment
+.env
+.env.local
+.env.*.local
