@@ -58,6 +58,9 @@ rather than by version number. Newest first.
 - **Globe-only marker picking** — hover and click candidates must be on the
   visible hemisphere and within 12 screen pixels of their exact projected
   coordinates, preventing location tooltips from appearing outside the globe.
+- **Valid cached marker style** — the marker sheen now uses a fixed radius with
+  no camera expression, and the application script URL is versioned so cached
+  copies of the invalid nested zoom expression are not reused after deployment.
 - **Smaller place circles** — marker and glow radii are half their previous
   size, reducing overlap without shrinking their forgiving interaction area.
 - **Stable station loading** — station data now loads before the results panel

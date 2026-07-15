@@ -892,12 +892,7 @@
         5, ['+', 7.5, ['*', 0.5, ['ln', ['+', 1, ['get', 'size']]]]],
         12, ['+', 9, ['*', 0.575, ['ln', ['+', 1, ['get', 'size']]]]],
       ];
-      const markerSheenRadius = [
-        'interpolate', ['linear'], ['zoom'],
-        0, ['*', 0.55, ['+', 3.5, ['*', 0.4, ['ln', ['+', 1, ['get', 'size']]]]]],
-        5, ['*', 0.55, ['+', 4.5, ['*', 0.5, ['ln', ['+', 1, ['get', 'size']]]]]],
-        12, ['*', 0.55, ['+', 6, ['*', 0.575, ['ln', ['+', 1, ['get', 'size']]]]]],
-      ];
+      const markerSheenRadius = 2.2;
       const map = new maplibregl.Map({
         container,
         center: [8, 35],
