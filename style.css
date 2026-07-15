@@ -859,3 +859,86 @@ input[type="text"] {
     display: none;
   }
 }
+
+/* ===== Globe View ===== */
+#globe-wrap {
+  position: relative;
+  height: min(70vh, 640px);
+  background: radial-gradient(ellipse at 50% 120%, #141430 0%, var(--bg-primary) 70%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+#globe-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+#globe-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+  z-index: 5;
+}
+
+#globe-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+#globe-zoom {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#globe-zoom button {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+#globe-zoom button:hover {
+  background: var(--accent);
+}
+
+#globe-stations {
+  margin-top: 20px;
+}
+
+@media (max-width: 640px) {
+  #globe-wrap {
+    height: 60vh;
+  }
+
+  #globe-hint {
+    display: none;
+  }
+}

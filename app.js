@@ -201,6 +201,7 @@
   // ===== Navigation =====
   const views = {
     discover: { title: 'Discover', showSearch: false },
+    globe: { title: 'Globe', showSearch: false },
     search: { title: 'Search', showSearch: true },
     favorites: { title: 'Favorites', showSearch: false },
     countries: { title: 'Browse by Country', showSearch: false },
@@ -236,6 +237,9 @@
     switch (view) {
       case 'discover':
         loadDiscover();
+        break;
+      case 'globe':
+        loadGlobe();
         break;
       case 'favorites':
         renderFavorites();
@@ -294,6 +298,267 @@
           <span>Check your internet connection and try again</span>
         </div>`;
     }
+  }
+
+  // ===== Globe View =====
+  // A dependency-free 3D globe: the ~12k city dots themselves draw the
+  // continents (orthographic projection on a 2D canvas, like Radio Garden).
+  let globeInited = false;
+
+  async function loadGlobe() {
+    if (globeInited) return;
+    globeInited = true;
+
+    const wrap = $('#globe-wrap');
+    const canvas = $('#globe-canvas');
+    const tooltip = $('#globe-tooltip');
+    const stationsEl = $('#globe-stations');
+    const ctx = canvas.getContext('2d');
+
+    let pts = [];
+    try {
+      const places = await getPlaces();
+      pts = places.filter((p) => Array.isArray(p.geo) && p.geo.length === 2);
+    } catch (err) {
+      console.error('Failed to load globe:', err);
+      wrap.innerHTML = '<div class="empty-state"><p>Failed to load the globe. Please refresh.</p></div>';
+      return;
+    }
+
+    // Precompute each place's trigonometry once
+    const n = pts.length;
+    const D2R = Math.PI / 180;
+    const sinLat = new Float32Array(n);
+    const cosLat = new Float32Array(n);
+    const sinLng = new Float32Array(n);
+    const cosLng = new Float32Array(n);
+    // Projected screen position + depth, refreshed every render (for hit testing)
+    const sx = new Float32Array(n);
+    const sy = new Float32Array(n);
+    const depth = new Float32Array(n);
+
+    pts.forEach((p, i) => {
+      const lng = p.geo[0] * D2R;
+      const lat = p.geo[1] * D2R;
+      sinLat[i] = Math.sin(lat);
+      cosLat[i] = Math.cos(lat);
+      sinLng[i] = Math.sin(lng);
+      cosLng[i] = Math.cos(lng);
+    });
+
+    // View state: centered on Europe to start
+    let lng0 = 10 * D2R;
+    let lat0 = 40 * D2R;
+    let zoom = 1;
+    let autoRotate = true;
+    let dirty = true;
+    let hovered = -1;
+    let dpr = 1;
+    let W = 0;
+    let H = 0;
+
+    function resize() {
+      dpr = window.devicePixelRatio || 1;
+      W = wrap.clientWidth;
+      H = wrap.clientHeight;
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      dirty = true;
+    }
+    resize();
+    new ResizeObserver(resize).observe(wrap);
+
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent-light').trim() || '#a78bfa';
+
+    function render() {
+      const cx = (W / 2) * dpr;
+      const cy = (H / 2) * dpr;
+      const R = Math.min(W, H) * 0.44 * zoom * dpr;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Sphere with subtle shading and rim glow
+      const grad = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
+      grad.addColorStop(0, 'rgba(120, 100, 200, 0.22)');
+      grad.addColorStop(0.7, 'rgba(60, 50, 110, 0.16)');
+      grad.addColorStop(1, 'rgba(30, 25, 60, 0.3)');
+      ctx.beginPath();
+      ctx.arc(cx, cy, R, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(167, 139, 250, 0.35)';
+      ctx.lineWidth = 1.5 * dpr;
+      ctx.stroke();
+
+      // Orthographic projection centered on (lat0, lng0)
+      const sinLat0 = Math.sin(lat0);
+      const cosLat0 = Math.cos(lat0);
+      const sinLng0 = Math.sin(lng0);
+      const cosLng0 = Math.cos(lng0);
+
+      ctx.fillStyle = accent;
+      for (let i = 0; i < n; i++) {
+        // cos/sin of (lng - lng0) via angle-difference identities
+        const cosDl = cosLng[i] * cosLng0 + sinLng[i] * sinLng0;
+        const sinDl = sinLng[i] * cosLng0 - cosLng[i] * sinLng0;
+        const z = sinLat0 * sinLat[i] + cosLat0 * cosLat[i] * cosDl;
+
+        if (z <= 0) {
+          depth[i] = -1;
+          sx[i] = -1e5;
+          continue;
+        }
+
+        const x = cosLat[i] * sinDl;
+        const y = cosLat0 * sinLat[i] - sinLat0 * cosLat[i] * cosDl;
+
+        const X = cx + x * R;
+        const Y = cy - y * R;
+        sx[i] = X;
+        sy[i] = Y;
+        depth[i] = z;
+
+        const boost = pts[i].boost;
+        const s = (boost ? 2.6 : pts[i].size > 40 ? 1.9 : 1.3) * dpr * Math.min(zoom, 2.2);
+        ctx.globalAlpha = 0.25 + 0.75 * z;
+        ctx.fillRect(X - s / 2, Y - s / 2, s, s);
+      }
+      ctx.globalAlpha = 1;
+
+      // Hovered city marker
+      if (hovered >= 0 && depth[hovered] > 0) {
+        ctx.beginPath();
+        ctx.arc(sx[hovered], sy[hovered], 5 * dpr, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = 2 * dpr;
+        ctx.stroke();
+      }
+    }
+
+    function frame() {
+      if (autoRotate) {
+        lng0 += 0.0006;
+        dirty = true;
+      }
+      if (dirty) {
+        dirty = false;
+        render();
+      }
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    // Nearest visible dot within grab distance of a canvas-space point
+    function hitTest(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      const mx = (clientX - rect.left) * dpr;
+      const my = (clientY - rect.top) * dpr;
+      const maxDist = 10 * dpr;
+      let best = -1;
+      let bestD = maxDist * maxDist;
+      for (let i = 0; i < n; i++) {
+        if (depth[i] <= 0) continue;
+        const dx = sx[i] - mx;
+        const dy = sy[i] - my;
+        const d = dx * dx + dy * dy;
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
+      }
+      return best;
+    }
+
+    // Drag to rotate, click to open a city
+    let dragging = false;
+    let moved = 0;
+    let lastX = 0;
+    let lastY = 0;
+
+    canvas.addEventListener('pointerdown', (e) => {
+      dragging = true;
+      moved = 0;
+      autoRotate = false;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      canvas.setPointerCapture(e.pointerId);
+      canvas.style.cursor = 'grabbing';
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (dragging) {
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
+        moved += Math.abs(dx) + Math.abs(dy);
+        lastX = e.clientX;
+        lastY = e.clientY;
+        const k = 0.005 / zoom;
+        lng0 -= dx * k;
+        lat0 += dy * k;
+        lat0 = Math.max(-1.45, Math.min(1.45, lat0));
+        dirty = true;
+        return;
+      }
+
+      const hit = hitTest(e.clientX, e.clientY);
+      if (hit !== hovered) {
+        hovered = hit;
+        dirty = true;
+      }
+      canvas.style.cursor = hit >= 0 ? 'pointer' : 'grab';
+
+      if (hit >= 0) {
+        const p = pts[hit];
+        tooltip.textContent = `${p.title}, ${p.country} · ${p.size} station${p.size === 1 ? '' : 's'}`;
+        const rect = wrap.getBoundingClientRect();
+        tooltip.style.left = `${e.clientX - rect.left + 14}px`;
+        tooltip.style.top = `${e.clientY - rect.top - 10}px`;
+        tooltip.classList.remove('hidden');
+      } else {
+        tooltip.classList.add('hidden');
+      }
+    });
+
+    canvas.addEventListener('pointerup', (e) => {
+      dragging = false;
+      canvas.style.cursor = 'grab';
+      if (moved < 5) {
+        const hit = hitTest(e.clientX, e.clientY);
+        if (hit >= 0) {
+          const p = pts[hit];
+          showPlaceStations(p, stationsEl, 'Back to Globe', () => {
+            stationsEl.classList.add('hidden');
+          });
+          stationsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    });
+
+    canvas.addEventListener('pointerleave', () => {
+      hovered = -1;
+      tooltip.classList.add('hidden');
+      dirty = true;
+    });
+
+    function setZoom(z) {
+      zoom = Math.max(0.8, Math.min(10, z));
+      dirty = true;
+    }
+
+    canvas.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault();
+        autoRotate = false;
+        setZoom(zoom * Math.exp(-e.deltaY * 0.0012));
+      },
+      { passive: false }
+    );
+
+    $('#globe-zoom-in').addEventListener('click', () => setZoom(zoom * 1.4));
+    $('#globe-zoom-out').addEventListener('click', () => setZoom(zoom / 1.4));
   }
 
   // ===== Search =====
