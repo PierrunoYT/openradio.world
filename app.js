@@ -34,6 +34,7 @@
   let placesCache = null;
   let placesPromise = null;
   let refreshGlobeMarkers = null;
+  let openGlobePlace = null;
 
   // ===== DOM References =====
   const $ = (sel) => document.querySelector(sel);
@@ -206,6 +207,7 @@
       id: channelId(page.url),
       name: page.title,
       place: page.place ? page.place.title : '',
+      placeId: page.place ? page.place.id : '',
       country: page.country ? page.country.title : '',
       website: page.website || '',
       secure: !!page.secure,
@@ -344,6 +346,31 @@
         loadCities();
         break;
     }
+  }
+
+  async function showPlaceOnGlobe(place) {
+    navigateTo('globe');
+    await loadMapLibreGlobe();
+    if (!openGlobePlace) {
+      showToast('The globe could not be loaded. Please try again.');
+      return false;
+    }
+    openGlobePlace(place);
+    return true;
+  }
+
+  async function showStationOnGlobe(station) {
+    const places = await getPlaces();
+    const place = (station.placeId && places.find((candidate) => candidate.id === station.placeId))
+      || places.find((candidate) => (
+        candidate.title.toLocaleLowerCase() === station.place.toLocaleLowerCase()
+        && candidate.country.toLocaleLowerCase() === station.country.toLocaleLowerCase()
+      ));
+    if (!place) {
+      showToast('This station location is not available on the globe.');
+      return false;
+    }
+    return showPlaceOnGlobe(place);
   }
 
   // ===== Discover View =====
@@ -1363,6 +1390,7 @@ void main() {
           },
         });
       };
+      openGlobePlace = openPlaceStations;
 
       map.on('click', (event) => {
         markerLayer.pick(event.point, (place) => {
@@ -1545,7 +1573,7 @@ void main() {
               <span>Try a different search term</span>
             </div>`;
         } else {
-          appendStationCards(container, stations);
+          appendStationCards(container, stations, undefined, { showOnGlobe: true });
         }
       } catch (err) {
         console.error('Search failed:', err);
@@ -1593,6 +1621,11 @@ void main() {
           ${escapeHtml(backLabel)}
         </button>
         <h3 class="section-title">${escapeHtml(place.title)}, ${escapeHtml(place.country)}</h3>
+        ${options.showOnGlobe ? `
+          <button class="view-on-globe-btn" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            View on Globe
+          </button>` : ''}
       </div>
       <div class="place-stations-results" aria-live="polite"></div>`;
 
@@ -1615,6 +1648,23 @@ void main() {
       });
     }
     stationsEl.setAttribute('aria-busy', 'false');
+
+    const viewOnGlobe = stationsEl.querySelector('.view-on-globe-btn');
+    if (viewOnGlobe) {
+      viewOnGlobe.addEventListener('click', async () => {
+        viewOnGlobe.disabled = true;
+        viewOnGlobe.setAttribute('aria-busy', 'true');
+        try {
+          await showPlaceOnGlobe(place);
+        } catch (err) {
+          console.error('Failed to open place on globe:', err);
+          showToast('The globe could not be loaded. Please try again.');
+        } finally {
+          viewOnGlobe.disabled = false;
+          viewOnGlobe.removeAttribute('aria-busy');
+        }
+      });
+    }
 
     stationsEl.querySelector('.back-btn').addEventListener('click', () => {
       const closeToken = {};
@@ -1756,7 +1806,7 @@ void main() {
       showPlaceStations(place, stationsEl, 'Back to Cities', () => {
         stationsEl.classList.add('hidden');
         citiesEl.classList.remove('hidden');
-      });
+      }, { showOnGlobe: true });
     });
   }
 
@@ -1778,7 +1828,7 @@ void main() {
         showPlaceStations(place, $('#city-stations'), 'Back to Cities', () => {
           $('#city-stations').classList.add('hidden');
           container.classList.remove('hidden');
-        });
+        }, { showOnGlobe: true });
       });
 
       citiesLoaded = true;
@@ -1913,6 +1963,10 @@ void main() {
           <span></span><span></span><span></span><span></span>
         </div>
         <div class="station-actions">
+          ${options.showOnGlobe && (station.placeId || station.place) ? `
+            <button class="btn-globe" type="button" aria-label="Show ${escapeAttr(station.place || 'station')} on globe" title="Show on globe">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            </button>` : ''}
           <button class="btn-fav ${fav ? 'active' : ''}" data-id="${escapeAttr(station.id)}" aria-label="Toggle favorite" title="Toggle favorite">
             ${
               fav
@@ -1923,6 +1977,22 @@ void main() {
         </div>`;
 
       card.addEventListener('click', (e) => {
+        const globeButton = e.target.closest('.btn-globe');
+        if (globeButton) {
+          globeButton.disabled = true;
+          globeButton.setAttribute('aria-busy', 'true');
+          showStationOnGlobe(station)
+            .catch((err) => {
+              console.error('Failed to open station on globe:', err);
+              showToast('The globe could not be loaded. Please try again.');
+            })
+            .finally(() => {
+              globeButton.disabled = false;
+              globeButton.removeAttribute('aria-busy');
+            });
+          return;
+        }
+
         if (e.target.closest('.btn-fav')) {
           toggleFavorite(station);
           return;
