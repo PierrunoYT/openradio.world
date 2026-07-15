@@ -8,8 +8,6 @@ No accounts, no ads, no tracking. Just open and listen.
 ![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
 ![Build](https://img.shields.io/badge/build-none_needed-brightgreen.svg)
 
-**GitHub:** [https://github.com/PierrunoYT/OpenRadio](https://github.com/PierrunoYT/OpenRadio)
-
 ![OpenRadio Screenshot](assets/Screenshot%202026-02-07%20at%2013-20-47%20OpenRadio%20-%20Worldwide%20Internet%20Radio.png)
 
 ---
@@ -39,8 +37,6 @@ No accounts, no ads, no tracking. Just open and listen.
 3. Start listening
 
 ```bash
-git clone https://github.com/PierrunoYT/OpenRadio.git
-cd OpenRadio
 # Open index.html in your browser
 start index.html        # Windows
 open index.html         # macOS
@@ -110,7 +106,9 @@ OpenRadio uses the internal API behind [Radio Garden](https://radio.garden/), th
 | `/api/search?q=...` | Search stations and places |
 | `/api/ara/content/listen/{channelId}/channel.mp3` | Redirects to the station's live stream |
 
-> **Note:** This API is unofficial and undocumented — Radio Garden may change or restrict it at any time. Favorites saved with earlier Radio Browser-based versions of OpenRadio are migrated automatically and keep playing through their original stream URLs.
+> **Note:** This API is unofficial and undocumented — Radio Garden may change or restrict it at any time.
+
+Playback never touches stream URLs directly: the app points the audio element at the `listen` endpoint and the browser follows the redirect, so streams always resolve to the station's current URL.
 
 ## Browser Support
 

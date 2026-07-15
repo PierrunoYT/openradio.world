@@ -75,10 +75,44 @@
     return res.json();
   }
 
+  // ===== Offline Snapshot Fallback =====
+  // data/ holds a crawled copy of the directory (see tools/snapshot.mjs).
+  // If the live API is unreachable (e.g. locked down), we serve from it.
+  let snapshot = null; // { places, stations, byPlace: Map<placeId, station[]> }
+  let snapshotNotified = false;
+
+  async function loadSnapshot() {
+    if (snapshot) return snapshot;
+    const [placesRes, stationsRes] = await Promise.all([
+      fetch('data/places.json'),
+      fetch('data/stations.json'),
+    ]);
+    if (!placesRes.ok || !stationsRes.ok) throw new Error('No local snapshot available');
+    const [places, stations] = await Promise.all([placesRes.json(), stationsRes.json()]);
+
+    const byPlace = new Map();
+    stations.forEach((s) => {
+      if (!byPlace.has(s.placeId)) byPlace.set(s.placeId, []);
+      byPlace.get(s.placeId).push(s);
+    });
+
+    snapshot = { places, stations, byPlace };
+    if (!snapshotNotified) {
+      snapshotNotified = true;
+      showToast('Live API unreachable — using local snapshot');
+    }
+    return snapshot;
+  }
+
   async function getPlaces() {
     if (placesCache) return placesCache;
-    const data = await apiFetch('/ara/content/places');
-    placesCache = data.data.list.filter((p) => p.title && p.country);
+    try {
+      const data = await apiFetch('/ara/content/places');
+      placesCache = data.data.list.filter((p) => p.title && p.country);
+    } catch (err) {
+      console.warn('Places API failed, trying local snapshot:', err.message);
+      placesCache = (await loadSnapshot()).places;
+    }
     return placesCache;
   }
 
@@ -105,16 +139,37 @@
   }
 
   async function getPlaceStations(placeId) {
-    const data = await apiFetch(`/ara/content/page/${placeId}/channels`);
-    const stations = [];
-    (data.data.content || []).forEach((block) => {
-      (block.items || []).forEach((item) => {
-        if (item.page && item.page.type === 'channel') {
-          stations.push(toStation(item.page));
-        }
+    try {
+      const data = await apiFetch(`/ara/content/page/${placeId}/channels`);
+      const stations = [];
+      (data.data.content || []).forEach((block) => {
+        (block.items || []).forEach((item) => {
+          if (item.page && item.page.type === 'channel') {
+            stations.push(toStation(item.page));
+          }
+        });
       });
-    });
-    return stations;
+      return stations;
+    } catch (err) {
+      console.warn('Channels API failed, trying local snapshot:', err.message);
+      return (await loadSnapshot()).byPlace.get(placeId) || [];
+    }
+  }
+
+  async function searchStations(query) {
+    try {
+      const results = await apiFetch(`/search?q=${encodeURIComponent(query)}`);
+      const hits = (results.hits && results.hits.hits) || [];
+      return hits
+        .filter((h) => h._source && h._source.type === 'channel' && h._source.page)
+        .map((h) => toStation(h._source.page));
+    } catch (err) {
+      console.warn('Search API failed, trying local snapshot:', err.message);
+      const q = query.toLowerCase();
+      return (await loadSnapshot()).stations
+        .filter((s) => s.name.toLowerCase().includes(q) || (s.place && s.place.toLowerCase().includes(q)))
+        .slice(0, 50);
+    }
   }
 
   function shuffle(arr) {
@@ -240,11 +295,7 @@
       container.innerHTML = '<div class="loading-placeholder"><div class="loader"></div></div>';
 
       try {
-        const results = await apiFetch(`/search?q=${encodeURIComponent(query)}`);
-        const hits = (results.hits && results.hits.hits) || [];
-        const stations = hits
-          .filter((h) => h._source && h._source.type === 'channel' && h._source.page)
-          .map((h) => toStation(h._source.page));
+        const stations = await searchStations(query);
 
         container.innerHTML = '';
 
@@ -602,6 +653,7 @@
 
   // ===== Audio Player =====
   let retryCount = 0;
+  let triedSnapshotStream = false;
   const MAX_RETRIES = 2;
 
   function playStation(station) {
@@ -609,6 +661,7 @@
     isLoading = true;
     isPlaying = false;
     retryCount = 0;
+    triedSnapshotStream = false;
     updatePlayerUI();
 
     playerBar.classList.remove('hidden');
@@ -723,19 +776,35 @@
     updatePlayerUI();
   });
 
-  audio.addEventListener('error', () => {
+  audio.addEventListener('error', async () => {
     if (!currentStation) return;
 
     if (retryCount < MAX_RETRIES) {
       retryCount++;
       console.log(`Stream error, retrying (${retryCount}/${MAX_RETRIES})...`);
       setTimeout(() => attemptPlay(streamUrl(currentStation)), 500 * retryCount);
-    } else {
-      isPlaying = false;
-      isLoading = false;
-      updatePlayerUI();
-      showToast('Stream unavailable. Try another station.');
+      return;
     }
+
+    // Last resort: the listen endpoint may be down — try the direct
+    // stream URL from the local snapshot
+    if (!currentStation.streamUrl && !triedSnapshotStream) {
+      triedSnapshotStream = true;
+      try {
+        const snap = await loadSnapshot();
+        const saved = snap.stations.find((s) => s.id === currentStation.id);
+        if (saved && saved.streamUrl) {
+          console.log('Falling back to snapshot stream URL...');
+          attemptPlay(saved.streamUrl);
+          return;
+        }
+      } catch {}
+    }
+
+    isPlaying = false;
+    isLoading = false;
+    updatePlayerUI();
+    showToast('Stream unavailable. Try another station.');
   });
 
   audio.addEventListener('ended', () => {
