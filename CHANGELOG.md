@@ -8,6 +8,13 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Open Graph link-preview image copy fixed** — the redesign re-rendered
+  `assets/og-image.png` in the new amber-on-navy style but kept the old
+  tagline ("Listen live to radio stations from every corner of the
+  world"), out of sync with the page's actual meta description. The
+  image is rebuilt with matching copy, and the `og:image`/`twitter:image`
+  URLs are now cache-busted so platforms that cache link previews by URL
+  pick up the refresh.
 - **Globe centered again after the zoom-in** — opening the globe bigger
   (previous entry) exposed a pre-existing offset: the camera's tilt
   (`pitch: 20`) shifts the rendered sphere downward relative to its
