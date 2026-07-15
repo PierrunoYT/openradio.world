@@ -49,7 +49,8 @@ body {
   color: var(--text-primary);
   overflow: hidden;
   height: 100vh;
-  width: 100vw;
+  height: 100dvh; /* mobile browsers: exclude collapsing URL bar */
+  width: 100%;
 }
 
 :focus-visible {
@@ -109,7 +110,8 @@ input[type="text"] {
   grid-template-columns: var(--sidebar-width) 1fr;
   grid-template-rows: 1fr auto;
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
 }
 
 /* ===== Sidebar ===== */
@@ -458,6 +460,18 @@ input[type="text"] {
   opacity: 1;
 }
 
+/* Touch devices have no hover — keep actions visible and give tap feedback */
+@media (hover: none) {
+  .station-actions {
+    opacity: 1;
+  }
+
+  .station-card:active {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 55%), var(--bg-card-hover);
+    transform: scale(0.99);
+  }
+}
+
 .btn-fav {
   color: var(--text-muted);
   padding: 4px;
@@ -571,13 +585,16 @@ input[type="text"] {
 /* ===== Player Bar ===== */
 #player-bar {
   grid-column: 1 / 3;
+  min-width: 0;
   height: var(--player-height);
+  height: calc(var(--player-height) + env(safe-area-inset-bottom));
   background: linear-gradient(180deg, rgba(19, 19, 30, 0.92) 0%, rgba(10, 10, 17, 0.96) 100%);
   border-top: 1px solid rgba(108, 92, 231, 0.28);
   box-shadow: 0 -10px 36px rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   padding: 0 24px;
+  padding: 0 24px env(safe-area-inset-bottom, 0px);
   gap: 20px;
   z-index: 200;
   backdrop-filter: blur(20px);
@@ -804,6 +821,7 @@ input[type="text"] {
 .toast {
   position: fixed;
   bottom: calc(var(--player-height) + 20px);
+  bottom: calc(var(--player-height) + env(safe-area-inset-bottom, 0px) + 20px);
   left: 50%;
   transform: translateX(-50%) translateY(20px);
   background: var(--bg-tertiary);
@@ -825,6 +843,14 @@ input[type="text"] {
 }
 
 /* ===== Responsive ===== */
+
+/* Tablets: slightly narrower sidebar so content keeps room */
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-width: 208px;
+  }
+}
+
 @media (max-width: 768px) {
   #app {
     grid-template-columns: 1fr;
@@ -835,7 +861,8 @@ input[type="text"] {
     top: 0;
     left: 0;
     bottom: 0;
-    width: var(--sidebar-width);
+    width: min(280px, 85vw);
+    padding-left: max(16px, env(safe-area-inset-left));
     transform: translateX(-100%);
     z-index: 300;
     box-shadow: var(--shadow-lg);
@@ -843,6 +870,11 @@ input[type="text"] {
 
   #sidebar.open {
     transform: translateX(0);
+  }
+
+  .nav-btn {
+    padding: 12px;
+    font-size: 1rem;
   }
 
   .sidebar-backdrop {
@@ -864,19 +896,40 @@ input[type="text"] {
     display: flex;
   }
 
+  #topbar {
+    padding: 0 12px;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    gap: 10px;
+  }
+
+  #view-title {
+    font-size: 1.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  /* 16px prevents iOS Safari from auto-zooming the page on focus */
+  #search-input {
+    font-size: 16px;
+  }
+
   #player-bar {
     grid-column: 1;
     padding: 0 12px;
+    padding: 0 max(12px, env(safe-area-inset-right)) env(safe-area-inset-bottom, 0px) max(12px, env(safe-area-inset-left));
     gap: 10px;
   }
 
   .player-station {
-    max-width: 150px;
+    max-width: none;
   }
 
   .player-extras {
     max-width: none;
-    flex: 0;
+    flex: 0 0 auto;
   }
 
   .volume-control {
@@ -884,7 +937,9 @@ input[type="text"] {
   }
 
   #content-area {
-    padding: 16px;
+    padding: 16px 12px;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
   }
 
   .stations-grid {
@@ -898,21 +953,25 @@ input[type="text"] {
   .station-actions {
     opacity: 1;
   }
+
+  .section-block {
+    margin-bottom: 28px;
+  }
+
+  .tag-chip {
+    padding: 10px 16px;
+  }
 }
 
 @media (max-width: 480px) {
-  .player-station {
-    max-width: 120px;
-  }
-
   .player-favicon {
     width: 40px;
     height: 40px;
   }
 
   .play-btn {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
   }
 
   #btn-prev, #btn-next {
@@ -1165,7 +1224,15 @@ input[type="text"] {
 @media (max-width: 640px) {
   #globe-wrap {
     flex-basis: 60vh;
+    flex-basis: 60dvh;
     height: 60vh;
+    height: 60dvh;
+  }
+
+  #globe-zoom button,
+  #globe-info-btn {
+    width: 42px;
+    height: 42px;
   }
 
   #globe-hint {
