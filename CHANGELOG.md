@@ -57,9 +57,10 @@ rather than by version number. Newest first.
   coordinates, preventing location tooltips from appearing outside the globe.
 - **Smaller place circles** — marker and glow radii are half their previous
   size, reducing overlap without shrinking their forgiving interaction area.
-- **Smooth station loading** — selecting a place now paints a dedicated loading
-  panel before scrolling, then crossfades the completed station grid into view
-  instead of replacing the globe results abruptly.
+- **Stable station loading** — station data now loads before the results panel
+  opens, with existing results left in place during updates. Removing the
+  forced loading modal prevents the page from shifting between temporary and
+  final content heights.
 - **Polished imagery credit** — the Esri attribution now uses a compact glass
   pill with clean spacing and responsive sizing instead of an overlapping info
   toggle and text box.

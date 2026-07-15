@@ -1131,10 +1131,23 @@
   async function showPlaceStations(place, stationsEl, backLabel, onBack, options = {}) {
     const requestToken = {};
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const wasVisible = !stationsEl.classList.contains('hidden')
+      && stationsEl.classList.contains('is-visible');
     placeStationRequests.set(stationsEl, requestToken);
-    stationsEl.classList.remove('hidden', 'is-ready', 'is-visible');
-    stationsEl.classList.add('place-stations-panel', 'is-loading');
     stationsEl.setAttribute('aria-busy', 'true');
+
+    let stations = [];
+    let loadError = null;
+    try {
+      stations = await getPlaceStations(place.id);
+    } catch (err) {
+      loadError = err;
+    }
+    if (placeStationRequests.get(stationsEl) !== requestToken) return;
+
+    stationsEl.classList.remove('hidden', 'is-loading', 'is-ready');
+    stationsEl.classList.add('place-stations-panel');
+    if (!wasVisible) stationsEl.classList.remove('is-visible');
     stationsEl.innerHTML = `
       <div class="place-stations-header">
         <button class="back-btn">
@@ -1143,14 +1156,25 @@
         </button>
         <h3 class="section-title">${escapeHtml(place.title)}, ${escapeHtml(place.country)}</h3>
       </div>
-      <div class="place-stations-stage">
-        <div class="place-stations-loading" role="status" aria-live="polite">
-          <div class="loader" aria-hidden="true"></div>
-          <p>Loading radio stations…</p>
-          <span>Finding stations in ${escapeHtml(place.title)}</span>
-        </div>
-        <div class="place-stations-results" aria-live="polite"></div>
-      </div>`;
+      <div class="place-stations-results" aria-live="polite"></div>`;
+
+    const results = stationsEl.querySelector('.place-stations-results');
+    if (loadError) {
+      console.error('Failed to load place stations:', loadError);
+      results.innerHTML = `
+        <div class="empty-state">
+          <p>Failed to load stations. Please try again.</p>
+          <span>Check your internet connection and try again</span>
+        </div>`;
+    } else if (stations.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.innerHTML = '<p>No stations in this place</p>';
+      results.appendChild(empty);
+    } else {
+      appendStationCards(results, stations);
+    }
+    stationsEl.setAttribute('aria-busy', 'false');
 
     stationsEl.querySelector('.back-btn').addEventListener('click', () => {
       const closeToken = {};
@@ -1160,7 +1184,7 @@
       const finishClose = () => {
         if (placeStationRequests.get(stationsEl) !== closeToken) return;
         stationsEl.classList.add('hidden');
-        stationsEl.classList.remove('place-stations-panel', 'is-loading', 'is-ready');
+        stationsEl.classList.remove('place-stations-panel', 'is-visible');
         stationsEl.removeAttribute('aria-busy');
         stationsEl.innerHTML = '';
         onBack();
@@ -1182,48 +1206,6 @@
         }
       });
     });
-
-    const revealResults = () => {
-      stationsEl.setAttribute('aria-busy', 'false');
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (placeStationRequests.get(stationsEl) !== requestToken) return;
-          stationsEl.classList.remove('is-loading');
-          stationsEl.classList.add('is-ready');
-        });
-      });
-    };
-
-    try {
-      const [stations] = await Promise.all([
-        getPlaceStations(place.id),
-        new Promise((resolve) => setTimeout(resolve, reducedMotion ? 0 : 320)),
-      ]);
-      if (placeStationRequests.get(stationsEl) !== requestToken) return;
-
-      const results = stationsEl.querySelector('.place-stations-results');
-
-      if (stations.length === 0) {
-        const empty = document.createElement('div');
-        empty.className = 'empty-state';
-        empty.innerHTML = '<p>No stations in this place</p>';
-        results.appendChild(empty);
-      } else {
-        appendStationCards(results, stations);
-      }
-
-      revealResults();
-    } catch (err) {
-      if (placeStationRequests.get(stationsEl) !== requestToken) return;
-      console.error('Failed to load place stations:', err);
-      const results = stationsEl.querySelector('.place-stations-results');
-      results.innerHTML = `
-        <div class="empty-state">
-          <p>Failed to load stations. Please try again.</p>
-          <span>Check your internet connection and try again</span>
-        </div>`;
-      revealResults();
-    }
   }
 
   function renderPlaceChips(container, places, onSelect) {
