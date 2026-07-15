@@ -28,6 +28,7 @@
   let favorites = {};
   let searchTimeout = null;
   let placesCache = null;
+  let placesPromise = null;
 
   // ===== DOM References =====
   const $ = (sel) => document.querySelector(sel);
@@ -66,6 +67,18 @@
     setupEventListeners();
     setupSidebarBackdrop();
     navigateTo('discover');
+
+    // Warm the large, static globe assets once the initial view has settled.
+    // Clicking Globe later can then render from memory instead of starting its
+    // downloads and script parsing at the moment of interaction.
+    const warmGlobe = () => prepareGlobeAssets().catch(() => {
+      // loadGlobe() will retry and show a useful error if the assets still fail.
+    });
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(warmGlobe, { timeout: 2000 });
+    } else {
+      setTimeout(warmGlobe, 1200);
+    }
   }
 
   // ===== API Helpers =====
@@ -79,41 +92,58 @@
   // data/ holds a crawled copy of the directory (see tools/snapshot.mjs).
   // If the live API is unreachable (e.g. locked down), we serve from it.
   let snapshot = null; // { places, stations, byPlace: Map<placeId, station[]> }
+  let snapshotPromise = null;
   let snapshotNotified = false;
 
   async function loadSnapshot() {
     if (snapshot) return snapshot;
-    const [placesRes, stationsRes] = await Promise.all([
-      fetch('data/places.json'),
-      fetch('data/stations.json'),
-    ]);
-    if (!placesRes.ok || !stationsRes.ok) throw new Error('No local snapshot available');
-    const [places, stations] = await Promise.all([placesRes.json(), stationsRes.json()]);
+    if (!snapshotPromise) {
+      snapshotPromise = (async () => {
+        const [placesRes, stationsRes] = await Promise.all([
+          fetch('data/places.json'),
+          fetch('data/stations.json'),
+        ]);
+        if (!placesRes.ok || !stationsRes.ok) throw new Error('No local snapshot available');
+        const [places, stations] = await Promise.all([placesRes.json(), stationsRes.json()]);
 
-    const byPlace = new Map();
-    stations.forEach((s) => {
-      if (!byPlace.has(s.placeId)) byPlace.set(s.placeId, []);
-      byPlace.get(s.placeId).push(s);
-    });
+        const byPlace = new Map();
+        stations.forEach((s) => {
+          if (!byPlace.has(s.placeId)) byPlace.set(s.placeId, []);
+          byPlace.get(s.placeId).push(s);
+        });
 
-    snapshot = { places, stations, byPlace };
-    if (!snapshotNotified) {
-      snapshotNotified = true;
-      showToast('Live API unreachable — using local snapshot');
+        snapshot = { places, stations, byPlace };
+        if (!snapshotNotified) {
+          snapshotNotified = true;
+          showToast('Live API unreachable — using local snapshot');
+        }
+        return snapshot;
+      })().catch((err) => {
+        snapshotPromise = null;
+        throw err;
+      });
     }
-    return snapshot;
+    return snapshotPromise;
   }
 
   async function getPlaces() {
     if (placesCache) return placesCache;
-    try {
-      const data = await apiFetch('/ara/content/places');
-      placesCache = data.data.list.filter((p) => p.title && p.country);
-    } catch (err) {
-      console.warn('Places API failed, trying local snapshot:', err.message);
-      placesCache = (await loadSnapshot()).places;
+    if (!placesPromise) {
+      placesPromise = (async () => {
+        try {
+          const data = await apiFetch('/ara/content/places');
+          placesCache = data.data.list.filter((p) => p.title && p.country);
+        } catch (err) {
+          console.warn('Places API failed, trying local snapshot:', err.message);
+          placesCache = (await loadSnapshot()).places;
+        }
+        return placesCache;
+      })().catch((err) => {
+        placesPromise = null;
+        throw err;
+      });
     }
-    return placesCache;
+    return placesPromise;
   }
 
   function channelId(pageUrl) {
@@ -302,8 +332,10 @@
 
   // ===== Globe View =====
   // WebGL globe (globe.gl, vendored in lib/) wrapped in NASA Blue Marble
-  // imagery. The library is loaded lazily the first time the view opens.
+  // imagery. Static rendering assets are warmed during browser idle time.
   let globeInited = false;
+  let globeLibraryPromise = null;
+  let globeCountriesPromise = null;
 
   function loadScript(src) {
     return new Promise((resolve, reject) => {
@@ -315,6 +347,36 @@
     });
   }
 
+  function loadGlobeLibrary() {
+    if (window.Globe) return Promise.resolve();
+    if (!globeLibraryPromise) {
+      globeLibraryPromise = loadScript('lib/globe.gl.min.js').catch((err) => {
+        globeLibraryPromise = null;
+        throw err;
+      });
+    }
+    return globeLibraryPromise;
+  }
+
+  function loadGlobeCountries() {
+    if (!globeCountriesPromise) {
+      globeCountriesPromise = fetch('data/countries-lite.geojson')
+        .then((res) => {
+          if (!res.ok) throw new Error(`Failed to load country geometry: ${res.status}`);
+          return res.json();
+        })
+        .catch((err) => {
+          globeCountriesPromise = null;
+          throw err;
+        });
+    }
+    return globeCountriesPromise;
+  }
+
+  function prepareGlobeAssets() {
+    return Promise.all([loadGlobeLibrary(), loadGlobeCountries()]);
+  }
+
   async function loadGlobe() {
     if (globeInited) return;
     globeInited = true;
@@ -324,41 +386,55 @@
     const tooltip = $('#globe-tooltip');
     const stationsEl = $('#globe-stations');
 
+    container.classList.add('loading-placeholder');
+    container.innerHTML = '<div class="loader" aria-label="Loading globe"></div>';
+
     let pts;
     let countries;
     try {
-      const [places, , geoRes] = await Promise.all([
+      const [places, , countryData] = await Promise.all([
         getPlaces(),
-        loadScript('lib/globe.gl.min.js'),
-        fetch('data/countries.geojson'),
+        loadGlobeLibrary(),
+        loadGlobeCountries(),
       ]);
       pts = places.filter((p) => Array.isArray(p.geo) && p.geo.length === 2);
-      countries = geoRes.ok ? await geoRes.json() : { features: [] };
+      countries = countryData;
     } catch (err) {
       console.error('Failed to load globe:', err);
       globeInited = false;
+      container.classList.remove('loading-placeholder');
       container.innerHTML = '<div class="empty-state"><p>Failed to load the globe. Please refresh.</p></div>';
       return;
     }
 
-    // Vector globe: country polygons on a colored sphere — crisp at any zoom.
-    // Pointer interaction is disabled: globe.gl would otherwise raycast the
-    // whole tessellated country geometry on every mouse move, which stutters.
-    // Clicks and the hover tooltip are handled manually via toGlobeCoords
-    // (a single cheap ray-vs-sphere test).
-    const globe = Globe({ rendererConfig: { antialias: true, powerPreference: 'high-performance' } })(container)
-      .width(wrap.clientWidth)
-      .height(wrap.clientHeight)
+    container.classList.remove('loading-placeholder');
+    container.innerHTML = '';
+
+    const initialWidth = Math.max(1, Math.round(wrap.clientWidth));
+    const initialHeight = Math.max(1, Math.round(wrap.clientHeight));
+    const pointRadius = (p) => (p.boost ? 0.18 : p.size > 40 ? 0.13 : 0.085);
+
+    // Keep every rendered layer at a distinct depth. Very small offsets cause
+    // the globe and country caps to compete in the depth buffer while moving.
+    const globe = Globe({
+      rendererConfig: {
+        antialias: true,
+        alpha: true,
+        powerPreference: 'high-performance',
+      },
+    })(container)
+      .width(initialWidth)
+      .height(initialHeight)
       .backgroundColor('rgba(0,0,0,0)')
       .showAtmosphere(true)
       .atmosphereColor('#a29bfe')
-      .atmosphereAltitude(0.15)
+      .atmosphereAltitude(0.12)
       .enablePointerInteraction(false)
       .polygonsData(countries.features)
       .polygonCapColor(() => '#26264f')
       .polygonSideColor(() => 'rgba(0, 0, 0, 0)')
       .polygonStrokeColor(() => 'rgba(162, 155, 254, 0.4)')
-      .polygonAltitude(0.002)
+      .polygonAltitude(0.006)
       .polygonsTransitionDuration(0)
       .pointsMerge(true)
       .pointsTransitionDuration(0)
@@ -366,46 +442,28 @@
       .pointLat((p) => p.geo[1])
       .pointLng((p) => p.geo[0])
       .pointColor((p) => (p.boost ? '#e9d5ff' : '#a29bfe'))
-      .pointAltitude(0.004)
-      .pointRadius((p) => (p.boost ? 0.2 : p.size > 40 ? 0.14 : 0.09));
+      .pointAltitude(0.012)
+      .pointRadius(pointRadius);
 
-    globe.globeMaterial().color.set('#0b0f2b'); // ocean
-    // Cap the render resolution on very high-DPI screens
+    globe.globeMaterial().color.set('#0b0f2b');
     globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    window.__globe = globe;
 
     globe.pointOfView({ lat: 45, lng: 10, altitude: 2 }, 0);
 
     const controls = globe.controls();
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.4;
-    controls.minDistance = 101.8; // globe radius is 100 units — allow close zoom
+    controls.autoRotateSpeed = 0.35;
+    controls.minDistance = 110;
     controls.maxDistance = 480;
     controls.addEventListener('start', () => {
       controls.autoRotate = false;
     });
 
-    // Shrink the city points as the camera gets closer, so a zoomed-in view
-    // shows small pins instead of fat cylinders. The floor keeps them from
-    // ever dropping below visible size. Rebuilding the merged geometry is
-    // not free, so do it debounced and only on real change.
-    let pointScale = 1;
-    let zoomTimer = null;
-    function updatePointScale() {
-      const alt = globe.pointOfView().altitude;
-      const s = Math.max(0.24, Math.min(1, alt / 1.4));
-      if (Math.abs(s - pointScale) / pointScale < 0.2) return;
-      pointScale = s;
-      globe
-        .pointRadius((p) => (p.boost ? 0.2 : p.size > 40 ? 0.14 : 0.09) * s)
-        .pointAltitude(0.004 * s);
-    }
-    controls.addEventListener('change', () => {
-      clearTimeout(zoomTimer);
-      zoomTimer = setTimeout(updatePointScale, 150);
-    });
-
-    // Manual click handling (pointer interaction is disabled above):
-    // a press-release with barely any movement counts as a click.
+    // Use the globe's cheap sphere projection for interaction instead of
+    // enabling polygon raycasting over the complete country mesh.
     let downX = 0;
     let downY = 0;
     container.addEventListener('pointerdown', (e) => {
@@ -448,8 +506,12 @@
       return bestD < maxRad * maxRad ? best : null;
     }
 
-    // Hover tooltip
-    container.addEventListener('pointermove', (e) => {
+    let hoverFrame = 0;
+    let hoverEvent = null;
+    function updateHover() {
+      hoverFrame = 0;
+      const e = hoverEvent;
+      if (!e) return;
       const rect = container.getBoundingClientRect();
       const coords = globe.toGlobeCoords(e.clientX - rect.left, e.clientY - rect.top);
       const hit = coords && nearestPlace(coords.lat, coords.lng);
@@ -462,13 +524,33 @@
       } else {
         tooltip.classList.add('hidden');
       }
+    }
+    container.addEventListener('pointermove', (e) => {
+      hoverEvent = { clientX: e.clientX, clientY: e.clientY };
+      if (!hoverFrame) hoverFrame = requestAnimationFrame(updateHover);
     });
 
-    container.addEventListener('pointerleave', () => tooltip.classList.add('hidden'));
+    container.addEventListener('pointerleave', () => {
+      hoverEvent = null;
+      if (hoverFrame) cancelAnimationFrame(hoverFrame);
+      hoverFrame = 0;
+      tooltip.classList.add('hidden');
+    });
     container.addEventListener('pointerdown', () => tooltip.classList.add('hidden'));
 
-    new ResizeObserver(() => {
-      globe.width(wrap.clientWidth).height(wrap.clientHeight);
+    let renderedWidth = initialWidth;
+    let renderedHeight = initialHeight;
+    let resizeFrame = 0;
+    new ResizeObserver(([entry]) => {
+      const width = Math.max(1, Math.round(entry.contentRect.width));
+      const height = Math.max(1, Math.round(entry.contentRect.height));
+      if (width === renderedWidth && height === renderedHeight) return;
+      renderedWidth = width;
+      renderedHeight = height;
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        globe.width(renderedWidth).height(renderedHeight);
+      });
     }).observe(wrap);
 
     // Zoom buttons (wheel/pinch zoom is built into the controls)

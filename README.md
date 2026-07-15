@@ -10,8 +10,6 @@ No accounts, no ads, no tracking. Just open and listen.
 
 **GitHub:** [https://github.com/PierrunoYT/openradio.world](https://github.com/PierrunoYT/openradio.world)
 
-![OpenRadio Screenshot](assets/Screenshot%202026-02-07%20at%2013-20-47%20OpenRadio%20-%20Worldwide%20Internet%20Radio.png)
-
 ---
 
 ## Features
@@ -28,7 +26,7 @@ No accounts, no ads, no tracking. Just open and listen.
 - **Keyboard Shortcuts** — Navigate and control playback without touching the mouse
 - **Responsive Design** — Works on desktop, tablet, and mobile
 - **Dark Theme** — Modern dark UI with purple accents and animated equalizer
-- **No Build Step** — Plain HTML, CSS, and JavaScript; the only dependency is a vendored copy of [globe.gl](https://github.com/vasturiano/globe.gl) for the 3D globe, loaded lazily
+- **No Build Step** — Plain HTML, CSS, and JavaScript; the only dependency is a vendored copy of [globe.gl](https://github.com/vasturiano/globe.gl) for the 3D globe, warmed during browser idle time
 - **Stream Retry Logic** — Automatic retries when a stream fails to start
 
 ## Getting Started

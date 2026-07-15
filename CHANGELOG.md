@@ -10,6 +10,10 @@ rather than by version number. Newest first.
 
 ### Changed
 
+- **Faster first globe open** — globe code and country geometry now warm in
+  browser idle time, the user sees a loading indicator when needed, and the
+  rendered country mesh uses a display-optimized copy with roughly 75% fewer
+  boundary vertices while retaining the full-resolution source data.
 - **Vector globe** — the globe now renders country shapes from Natural Earth
   vector data (50m resolution) on a dark stylized sphere with an atmosphere
   glow, instead of a satellite photo texture. Vector shapes stay razor sharp
