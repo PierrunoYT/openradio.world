@@ -8,6 +8,19 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Mobile responsiveness pass** — the app now behaves properly on phones
+  and tablets. The layout sizes itself with dynamic viewport units so the
+  player bar is never hidden behind a mobile browser's collapsing URL bar,
+  and the player bar, topbar, sidebar, and content respect the safe-area
+  insets of notched phones. A long station name no longer pushes the player
+  bar past the viewport edge — it truncates with an ellipsis. Station-card
+  favorite buttons are always visible on touch screens (any width) with a
+  subtle press effect, the search field no longer triggers iOS Safari's
+  auto-zoom on focus, and touch targets grew across the board (nav buttons,
+  chips, play button, globe controls). Tablets get a narrower sidebar, the
+  phone drawer is capped at 85% of the screen width and closes on Escape,
+  and the mobile globe view uses dynamic viewport height. Verified in a
+  headless browser at phone and tablet sizes with zero horizontal overflow.
 - **UI polish pass** — the app-wide dark theme gained depth and hierarchy:
   Inter as the interface font, subtle purple/green ambient gradients behind
   the content, gradient-tinted station cards with accent hover glow,
