@@ -1,6 +1,6 @@
 # 📻 OpenRadio
 
-**A free, open-source internet radio player for listening to worldwide radio stations — right in your browser.**
+**A free internet radio player for listening to worldwide radio stations — right in your browser.**
 
 No accounts, no ads, no tracking. Just open and listen.
 
@@ -142,4 +142,4 @@ This project is licensed under the [MIT License](LICENSE).
 
 ---
 
-**OpenRadio** — Open Source. Free Forever.
+**OpenRadio** — Free Forever.
