@@ -8,6 +8,10 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Straight-back zoom out** — cursor-anchored zooming now only applies when
+  zooming in (diving toward the place under the pointer); zooming out
+  recedes around the screen center, removing the orbit-like swing the globe
+  made when the anchor point was held fixed while pulling back.
 - **Visible head-on markers** — spikes point radially at the camera near the
   center of the visible hemisphere and collapsed to a subpixel cap, leaving
   the globe's face looking empty. Each spike tip now carries a screen-sized
