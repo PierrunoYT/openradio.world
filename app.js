@@ -348,14 +348,14 @@
     }
   }
 
-  async function showPlaceOnGlobe(place) {
+  async function showPlaceOnGlobe(place, options = {}) {
     navigateTo('globe');
     await loadMapLibreGlobe();
     if (!openGlobePlace) {
       showToast('The globe could not be loaded. Please try again.');
       return false;
     }
-    openGlobePlace(place);
+    openGlobePlace(place, options);
     return true;
   }
 
@@ -370,7 +370,7 @@
       showToast('This station location is not available on the globe.');
       return false;
     }
-    return showPlaceOnGlobe(place);
+    return showPlaceOnGlobe(place, { markLocation: true });
   }
 
   // ===== Discover View =====
@@ -1368,12 +1368,14 @@ void main() {
         });
       };
 
-      const openPlaceStations = (place) => {
-        selectPlaceMarker(null);
+      const openPlaceStations = (place, options = {}) => {
+        selectPlaceMarker(options.markLocation ? place : null);
         globeView.classList.add('has-stations');
         stationsEl.classList.remove('hidden');
         stationsEl.innerHTML = '<div class="loading-placeholder"><div class="loader" aria-label="Loading stations"></div></div>';
-        focusPlace(place);
+        focusPlace(place, options.markLocation ? {
+          zoom: Math.max(8, Math.min(10, map.getZoom())),
+        } : {});
         showPlaceStations(place, stationsEl, 'Back to Globe', () => {
           globeView.classList.remove('has-stations');
           // Once the map expands again, resize and re-center it on the city the
@@ -1621,11 +1623,6 @@ void main() {
           ${escapeHtml(backLabel)}
         </button>
         <h3 class="section-title">${escapeHtml(place.title)}, ${escapeHtml(place.country)}</h3>
-        ${options.showOnGlobe ? `
-          <button class="view-on-globe-btn" type="button">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            View on Globe
-          </button>` : ''}
       </div>
       <div class="place-stations-results" aria-live="polite"></div>`;
 
@@ -1645,26 +1642,11 @@ void main() {
     } else {
       appendStationCards(results, stations, undefined, {
         onSelect: options.onStationSelect,
+        showOnGlobe: options.showOnGlobe === true,
       });
     }
     stationsEl.setAttribute('aria-busy', 'false');
 
-    const viewOnGlobe = stationsEl.querySelector('.view-on-globe-btn');
-    if (viewOnGlobe) {
-      viewOnGlobe.addEventListener('click', async () => {
-        viewOnGlobe.disabled = true;
-        viewOnGlobe.setAttribute('aria-busy', 'true');
-        try {
-          await showPlaceOnGlobe(place);
-        } catch (err) {
-          console.error('Failed to open place on globe:', err);
-          showToast('The globe could not be loaded. Please try again.');
-        } finally {
-          viewOnGlobe.disabled = false;
-          viewOnGlobe.removeAttribute('aria-busy');
-        }
-      });
-    }
 
     stationsEl.querySelector('.back-btn').addEventListener('click', () => {
       const closeToken = {};
@@ -1963,7 +1945,7 @@ void main() {
           <span></span><span></span><span></span><span></span>
         </div>
         <div class="station-actions">
-          ${options.showOnGlobe && (station.placeId || station.place) ? `
+          ${options.showOnGlobe !== false && (station.placeId || station.place) ? `
             <button class="btn-globe" type="button" aria-label="Show ${escapeAttr(station.place || 'station')} on globe" title="Show on globe">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
             </button>` : ''}
