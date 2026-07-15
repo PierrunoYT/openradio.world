@@ -867,15 +867,15 @@
       };
       const markerRadius = [
         'interpolate', ['linear'], ['zoom'],
-        0, ['+', 5, ['*', 0.55, ['ln', ['+', 1, ['get', 'size']]]]],
-        5, ['+', 7, ['*', 0.75, ['ln', ['+', 1, ['get', 'size']]]]],
-        12, ['+', 10, ['*', 0.9, ['ln', ['+', 1, ['get', 'size']]]]],
+        0, ['+', 7, ['*', 0.8, ['ln', ['+', 1, ['get', 'size']]]]],
+        5, ['+', 9, ['*', 1, ['ln', ['+', 1, ['get', 'size']]]]],
+        12, ['+', 12, ['*', 1.15, ['ln', ['+', 1, ['get', 'size']]]]],
       ];
       const markerGlowRadius = [
         'interpolate', ['linear'], ['zoom'],
-        0, ['+', 11, ['*', 0.55, ['ln', ['+', 1, ['get', 'size']]]]],
-        5, ['+', 13, ['*', 0.75, ['ln', ['+', 1, ['get', 'size']]]]],
-        12, ['+', 16, ['*', 0.9, ['ln', ['+', 1, ['get', 'size']]]]],
+        0, ['+', 13, ['*', 0.8, ['ln', ['+', 1, ['get', 'size']]]]],
+        5, ['+', 15, ['*', 1, ['ln', ['+', 1, ['get', 'size']]]]],
+        12, ['+', 18, ['*', 1.15, ['ln', ['+', 1, ['get', 'size']]]]],
       ];
       const map = new maplibregl.Map({
         container,
@@ -1009,17 +1009,21 @@
       ]);
       wrap.classList.remove('is-loading');
 
-      function zoomBy(delta) {
+      function zoomBy(delta, around) {
         stopAutoRotate();
         map.stop();
-        map.jumpTo({ zoom: Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), map.getZoom() + delta)) });
+        const zoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), map.getZoom() + delta));
+        if (around) map.easeTo({ zoom, around, duration: 0 });
+        else map.jumpTo({ zoom });
       }
       container.addEventListener('wheel', (event) => {
         event.preventDefault();
         if (!event.deltaY) return;
         const modeScale = event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? container.clientHeight : 1;
         const delta = Math.max(-0.5, Math.min(0.5, -event.deltaY * modeScale / 400));
-        zoomBy(delta);
+        const rect = map.getCanvas().getBoundingClientRect();
+        const around = map.unproject([event.clientX - rect.left, event.clientY - rect.top]);
+        zoomBy(delta, around);
       }, { passive: false });
       $('#globe-zoom-in').addEventListener('click', () => zoomBy(1));
       $('#globe-zoom-out').addEventListener('click', () => zoomBy(-1));

@@ -23,7 +23,7 @@ rather than by version number. Newest first.
   easier to hover and select while remaining aligned with the globe.
 - **Synchronized loading** — the loader remains visible until initial imagery
   tiles and station points have rendered together.
-- **Direct globe zoom** — wheel input applies proportional, center-anchored
+- **Direct globe zoom** — wheel input applies proportional, cursor-anchored
   zoom updates without MapLibre's built-in easing, while the buttons move one
   level immediately. Zoom levels 0 through 19 match the satellite imagery.
 - **Readable attribution** — Esri imagery credits now use a high-contrast dark
