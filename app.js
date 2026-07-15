@@ -903,6 +903,10 @@ out vec4 fragColor;
 void main() {
   float dist = length(v_corner);
   if (dist > 1.0) discard;
+  // Bias the dot slightly toward the camera so the curved globe surface,
+  // which writes depth, occludes back-hemisphere dots without z-fighting
+  // the ones sitting on the visible side.
+  gl_FragDepth = clamp(gl_FragCoord.z - 0.0015, 0.0, 1.0);
   if (u_pick_mode > 0.5) {
     fragColor = vec4(v_pick, 1.0);
     return;
@@ -1026,14 +1030,19 @@ void main() {
             gl.uniform1f(uniforms.u_dot_radius, (pickMode ? 6.5 : 5) * pixelScale);
             if (pickMode) {
               gl.disable(gl.BLEND);
+              gl.disable(gl.DEPTH_TEST);
             } else {
               gl.enable(gl.BLEND);
               gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+              gl.enable(gl.DEPTH_TEST);
+              gl.depthFunc(gl.LEQUAL);
+              gl.depthMask(false);
             }
             gl.bindVertexArray(this.getDotVao(gl));
             gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, markers.length);
             gl.bindVertexArray(null);
             gl.disable(gl.BLEND);
+            gl.depthMask(true);
           },
 
           ensurePickTarget(gl) {
@@ -1083,13 +1092,23 @@ void main() {
             gl.bindFramebuffer(gl.FRAMEBUFFER, previousFramebuffer);
             gl.viewport(previousViewport[0], previousViewport[1], previousViewport[2], previousViewport[3]);
             const id = pixel[0] | (pixel[1] << 8) | (pixel[2] << 16);
-            const place = id > 0 ? markers[id - 1] || null : null;
+            let place = id > 0 ? markers[id - 1] || null : null;
+            // The pick buffer has no globe depth, so reject hits on the far
+            // hemisphere that the visible globe would occlude.
+            if (place) {
+              const center = this.map.getCenter();
+              const centerLatitude = center.lat * Math.PI / 180;
+              const placeLatitude = Number(place.geo[1]) * Math.PI / 180;
+              const longitudeDelta = (Number(place.geo[0]) - center.lng) * Math.PI / 180;
+              const facing = Math.sin(centerLatitude) * Math.sin(placeLatitude)
+                + Math.cos(centerLatitude) * Math.cos(placeLatitude) * Math.cos(longitudeDelta);
+              if (facing < -0.05) place = null;
+            }
             pick.callbacks.forEach((callback) => callback(place));
           },
 
           render(gl, args) {
             const entry = this.getProgram(gl, args.shaderData);
-            gl.disable(gl.DEPTH_TEST);
             gl.disable(gl.CULL_FACE);
             this.drawScene(gl, entry, args, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
             if (this.pendingPick) this.resolvePick(gl, entry, args);

@@ -8,6 +8,11 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Solid globe again** — the green dots briefly rendered without depth
+  testing, so far-side cities showed through the planet and drifted like a
+  floating layer while zooming. Dots are depth-tested against the globe
+  surface again (with a small bias so ground-hugging dots aren't swallowed
+  by the curvature), and picking rejects far-hemisphere hits.
 - **Radio Garden-style green dot markers** — the pink 3D spikes are replaced
   by the look the app was always chasing: flat, uniform, glowing green dots
   hugging the satellite surface at a constant screen size, matching
