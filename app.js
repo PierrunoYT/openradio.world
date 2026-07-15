@@ -2049,6 +2049,9 @@ void main() {
         case 'f':
           if (currentStation) toggleFavorite(currentStation);
           break;
+        case 'Escape':
+          closeSidebar();
+          break;
       }
     });
   }
