@@ -12,6 +12,29 @@ No accounts, no ads, no tracking. Just open and listen.
 
 ---
 
+## Today's Changes
+
+### 2026-07-15
+
+- **Globe** — Replaced the WebGL and globe.gl implementation with a
+  dependency-free Canvas 2D renderer, added sharp Natural Earth outlines and
+  accurately projected city markers, optimized rendering and marker hit
+  detection, and expanded zoom from `0.55x` to `12x`.
+- **Streams on HTTPS** — Added a restricted `/listen` proxy so stations using
+  plain-HTTP streams can play securely on the deployed HTTPS site.
+- **Offline resilience** — Added a resumable full-directory snapshot and
+  automatic fallbacks for browsing, search, and station playback when the
+  live Radio Garden API is unavailable.
+- **Site launch** — Deployed OpenRadio to Cloudflare Pages, connected
+  **openradio.world**, and established the project repository.
+- **New backend: Radio Garden** — Rebuilt discovery, search, country and city
+  browsing, playback, and favorite migration around the unofficial Radio
+  Garden API.
+
+For complete details, see the [changelog](CHANGELOG.md).
+
+---
+
 ## Features
 
 - **Thousands of stations in 12,000+ cities** worldwide via the [Radio Garden](https://radio.garden/) API

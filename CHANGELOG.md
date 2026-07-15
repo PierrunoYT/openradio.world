@@ -20,6 +20,13 @@ rather than by version number. Newest first.
   and simplified Natural Earth country outlines stay sharp at any size.
 - **Direct interaction** — drag rotation, wheel and button zoom, hover
   tooltips, and city selection are handled directly by the canvas renderer.
+- **Faster rendering and interaction** — geographic coordinates and marker
+  sizes are precomputed, pointer redraws are coalesced to animation frames,
+  offscreen markers are skipped, and a screen-space index makes city hover
+  and selection responsive without scanning every place.
+- **Expanded zoom range** — the globe can now zoom from `0.55x` to `12x`,
+  replacing the previous `0.72x` to `2.8x` limit. Auto-rotation is also
+  faster and easier to see.
 - **Lower background cost** — animation stops whenever another app view is
   open, and render resolution is capped on high-DPI screens.
 - **Faster first and offline open** — only the small country geometry and
@@ -28,7 +35,7 @@ rather than by version number. Newest first.
 ### Added
 
 - **Globe view** — an interactive 3D globe in the style of radio.garden as
-  a new sidebar entry: drag to spin (with inertia), scroll or use the +/−
+  a new sidebar entry: drag to spin, scroll or use the +/−
   buttons to zoom, hover a city for its name and station count, click a
   city to list and play its stations. A live badge shows the loaded place and
   station totals, featured cities render as larger dots, and the globe slowly
