@@ -2033,7 +2033,7 @@ void main() {
       const source = context.createMediaElementSource(audio);
       const analyser = context.createAnalyser();
       analyser.fftSize = 512;
-      analyser.smoothingTimeConstant = 0.78;
+      analyser.smoothingTimeConstant = 0.58;
       source.connect(analyser);
       analyser.connect(context.destination);
       waveAudioContext = context;
@@ -2059,7 +2059,8 @@ void main() {
       energy += normalized * normalized;
     }
     const rms = Math.sqrt(energy / (end - start));
-    return Math.max(0, Math.min(1, (rms - 0.035) / 0.58));
+    const normalized = Math.max(0, Math.min(1, (rms - 0.012) / 0.3));
+    return Math.pow(normalized, 0.72);
   }
 
   function drawPlayerWave(timestamp = 0) {
@@ -2080,13 +2081,13 @@ void main() {
     waveTargetLevels.fill(0);
     if (waveAnalyser && isPlaying) {
       waveAnalyser.getByteFrequencyData(waveFrequencyData);
-      waveTargetLevels[0] = measureWaveLevel(60, 300);
-      waveTargetLevels[1] = measureWaveLevel(300, 2200);
-      waveTargetLevels[2] = measureWaveLevel(2200, 9000);
+      waveTargetLevels[0] = Math.min(1, measureWaveLevel(60, 300) * 1.15);
+      waveTargetLevels[1] = Math.min(1, measureWaveLevel(300, 2200) * 1.35);
+      waveTargetLevels[2] = Math.min(1, measureWaveLevel(2200, 9000) * 1.65);
     }
 
     for (let line = 0; line < waveLevels.length; line++) {
-      const smoothing = waveTargetLevels[line] > waveLevels[line] ? 0.32 : 0.09;
+      const smoothing = waveTargetLevels[line] > waveLevels[line] ? 0.52 : 0.16;
       waveLevels[line] += (waveTargetLevels[line] - waveLevels[line]) * smoothing;
     }
 
@@ -2098,9 +2099,9 @@ void main() {
     waveContext.lineCap = 'round';
     waveContext.lineJoin = 'round';
     for (let line = 0; line < 3; line++) {
-      const activity = isPlaying ? 0.3 + waveLevels[line] * 0.7 : 0;
-      const amplitude = 0.38 + activity * height * 0.105;
-      const phase = elapsed * speeds[line];
+      const activity = isPlaying ? 0.2 + waveLevels[line] : 0;
+      const amplitude = 0.45 + activity * height * 0.145;
+      const phase = elapsed * speeds[line] * (0.8 + activity * 1.25);
 
       waveContext.beginPath();
       waveContext.moveTo(3, centers[line]);
@@ -2121,9 +2122,10 @@ void main() {
         const progress = x / width;
         const envelope = Math.pow(Math.sin(Math.PI * progress), 0.7);
         const primary = Math.sin(progress * Math.PI * 2 * cycles[line] + phase);
-        const detail = Math.sin(progress * Math.PI * 2 * (cycles[line] * 2.35) - phase * 0.65) * 0.22;
+        const detail = Math.sin(progress * Math.PI * 2 * (cycles[line] * 2.35) - phase * 0.65)
+          * (0.18 + activity * 0.24);
         const y = centers[line]
-          + (primary + detail * activity) * amplitude * envelope;
+          + (primary + detail) * amplitude * envelope;
         if (x === 0) waveContext.moveTo(x, y);
         else waveContext.lineTo(x, y);
       }
