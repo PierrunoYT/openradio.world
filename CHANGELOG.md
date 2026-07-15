@@ -11,7 +11,9 @@ commit order rather than by version number. Newest change first.
 - **Discover can be refreshed in place** — a new Refresh button rerolls the
   featured cities and stations without requiring another sidebar click or a
   full page reload. The control shows its loading state and prevents duplicate
-  refreshes while station data is being fetched.
+  refreshes while station data is being fetched. The app also creates the
+  control defensively when an older cached page loads the latest script, so a
+  mixed deployment cannot interrupt initialization.
 
 - **Station browser now stays beside the selected place** — choosing a city
   from globe search or by clicking a marker now zooms to a city-level view
