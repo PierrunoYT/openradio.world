@@ -5,7 +5,7 @@
 No accounts, no ads, no tracking. Just open and listen.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
+![Dependencies](https://img.shields.io/badge/dependencies-1_(vendored)-brightgreen.svg)
 ![Build](https://img.shields.io/badge/build-none_needed-brightgreen.svg)
 
 **GitHub:** [https://github.com/PierrunoYT/openradio.world](https://github.com/PierrunoYT/openradio.world)
@@ -16,10 +16,10 @@ No accounts, no ads, no tracking. Just open and listen.
 
 ### 2026-07-15
 
-- **Globe** — Replaced the WebGL and globe.gl implementation with a
-  dependency-free Canvas 2D renderer, added sharp Natural Earth outlines and
-  accurately projected city markers, optimized rendering and marker hit
-  detection, and expanded zoom from `0.55x` to `12x`.
+- **Globe** — Uses a reliable, locally vendored globe.gl WebGL renderer with
+  full-resolution Natural Earth vector countries, a fast Canvas marker
+  overlay, level-of-detail clustering, synchronized marker loading, accurate
+  dot selection, and an expanded `0.02` to `12` camera-altitude range.
 - **Streams on HTTPS** — Added a restricted `/listen` proxy so stations using
   plain-HTTP streams can play securely on the deployed HTTPS site.
 - **Offline resilience** — Added a resumable full-directory snapshot and
@@ -39,7 +39,7 @@ For complete details, see the [changelog](CHANGELOG.md).
 
 - **Thousands of stations in 12,000+ cities** worldwide via the [Radio Garden](https://radio.garden/) API
 - **Discover** — Stations from a rotating selection of featured cities around the globe
-- **Globe** — A lightweight interactive canvas globe with country outlines and accurately projected city markers; spin, zoom, and click a city to tune in
+- **Globe** — A smooth globe.gl WebGL globe with sharp Natural Earth vector countries and fast station-density markers; spin, zoom, and click a city to tune in
 - **Search** — Real-time search by station name or place
 - **Browse by Country** — Drill down from country to city to stations
 - **Browse by City** — Every city on the Radio Garden globe, sorted by station count
@@ -49,7 +49,7 @@ For complete details, see the [changelog](CHANGELOG.md).
 - **Keyboard Shortcuts** — Navigate and control playback without touching the mouse
 - **Responsive Design** — Works on desktop, tablet, and mobile
 - **Dark Theme** — Modern dark UI with purple accents and animated equalizer
-- **No Build Step** — Plain HTML, CSS, and JavaScript with no runtime dependencies
+- **No Build Step** — Plain HTML, CSS, and JavaScript; globe.gl is vendored locally and requires no package installation
 - **Stream Retry Logic** — Automatic retries when a stream fails to start
 
 ## Getting Started
@@ -119,8 +119,8 @@ OpenRadio/
 - **CSS Custom Properties** for theming
 - **Media Session API** for OS-level media controls
 - **localStorage** for favorites and preferences
-- **Canvas 2D** — dependency-free orthographic globe rendering, interaction, and city markers
-- **Natural Earth** — simplified vector country boundaries
+- **globe.gl** (vendored, MIT) — reliable WebGL globe rendering with a lightweight Canvas city-marker overlay
+- **Natural Earth** — full-resolution vector country geometry that remains sharp while zooming
 - **Vanilla JavaScript** — no frameworks, no transpilers, no bundlers
 
 ## API

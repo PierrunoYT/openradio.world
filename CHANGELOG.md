@@ -10,27 +10,32 @@ rather than by version number. Newest first.
 
 ### Changed
 
-- **Rewritten from scratch** — the globe is now a dependency-free
-  orthographic renderer built on one Canvas 2D element. It no longer depends
-  on globe.gl, WebGL, raster earth textures, or topology maps.
-- **Radio Garden-style place markers** — all 12,326 places are projected from
-  their actual coordinates as bright green points. Marker size reflects the
-  city's station count and featured cities remain emphasized.
-- **New globe design** — a shaded ocean, atmospheric rim, geographic grid,
-  and simplified Natural Earth country outlines stay sharp at any size.
-- **Direct interaction** — drag rotation, wheel and button zoom, hover
-  tooltips, and city selection are handled directly by the canvas renderer.
-- **Faster rendering and interaction** — geographic coordinates and marker
-  sizes are precomputed, pointer redraws are coalesced to animation frames,
-  offscreen markers are skipped, and a screen-space index makes city hover
-  and selection responsive without scanning every place.
-- **Expanded zoom range** — the globe can now zoom from `0.55x` to `12x`,
-  replacing the previous `0.72x` to `2.8x` limit. Auto-rotation is also
-  faster and easier to see.
+- **Reliable globe.gl renderer** — the globe uses a locally vendored release
+  of the established globe.gl WebGL library instead of a custom globe engine.
+- **High-resolution vector Earth** — the full Natural Earth country dataset
+  is rendered as GPU-accelerated globe.gl polygons, keeping coastlines and
+  borders sharp at every zoom level without a stretched raster Earth image.
+- **Radio Garden-style place markers** — all 12,326 places are represented by
+  bright screen-space points. Geographic level-of-detail clustering keeps the
+  world view readable and progressively reveals every place while zooming.
+- **Fast rendering and interaction** — the Earth stays on the GPU while city
+  markers are drawn in one Canvas overlay. Expensive scene raycasting remains
+  disabled, and hover/click use a screen-space marker index with
+  animation-frame throttling.
+- **Synchronized markers** — the globe and its first marker frame are revealed
+  together after the vector Earth is ready, preventing the globe from
+  appearing before its green place dots.
+- **Accurate marker selection** — dots and hit testing now use the same surface
+  projection and screen-space marker index, so hover and clicks stay aligned
+  with the visible green dots at close zoom and clustered world views.
+- **Expanded zoom range** — wheel, pinch, and button zoom now share an
+  altitude range of `0.02` to `12`, allowing near-surface detail and a much
+  farther world view without the previous camera restriction.
 - **Lower background cost** — animation stops whenever another app view is
   open, and render resolution is capped on high-DPI screens.
-- **Faster first and offline open** — only the small country geometry and
-  places snapshot are needed to render the globe.
+- **Faster first and offline open** — the library and local country geometry
+  warm during browser idle time, and offline globe loading only needs the
+  places snapshot rather than the full station catalog.
 
 ### Added
 

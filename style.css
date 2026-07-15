@@ -878,30 +878,30 @@ input[type="text"] {
   /* Fill the content area (shrinks automatically when the player bar shows) */
   flex: 1;
   min-height: 320px;
-  background:
-    radial-gradient(circle at 50% 45%, rgba(32, 75, 104, 0.22), transparent 38%),
-    radial-gradient(ellipse at 50% 120%, #141430 0%, var(--bg-primary) 70%);
+  background: radial-gradient(ellipse at 50% 120%, #141430 0%, var(--bg-primary) 70%);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
-#globe-canvas {
+#globe-3d {
   position: absolute;
   inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
   cursor: grab;
   touch-action: none;
 }
 
-#globe-canvas.is-dragging {
-  cursor: grabbing;
+#globe-3d canvas {
+  display: block;
 }
 
-#globe-canvas.has-hit {
-  cursor: pointer;
+#globe-points {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
 }
 
 .globe-loader {
@@ -918,14 +918,9 @@ input[type="text"] {
   display: flex;
 }
 
-#globe-wrap.is-loading #globe-canvas {
-  opacity: 0.25;
-}
-
-.globe-error {
-  position: absolute;
-  inset: 50% 0 auto;
-  transform: translateY(-50%);
+#globe-wrap.is-loading #globe-3d,
+#globe-wrap.is-loading #globe-points {
+  opacity: 0;
 }
 
 #globe-stats {

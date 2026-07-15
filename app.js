@@ -69,8 +69,8 @@
     setupSidebarBackdrop();
     navigateTo('discover');
 
-    // Warm the country geometry once the initial view has settled so the globe
-    // can draw immediately when it is opened.
+    // Warm the globe library and vector country geometry once the initial view
+    // has settled so opening the globe does not start those downloads.
     const warmGlobe = () => prepareGlobeAssets().catch(() => {
       // loadGlobe() will retry and show a useful error if the assets still fail.
     });
@@ -269,7 +269,8 @@
     currentView = view;
     const config = views[view];
 
-    // Pause the canvas animation whenever the globe is not visible.
+    // globe.gl otherwise keeps its render loop alive underneath every view.
+    // Pause it whenever the globe is not visible.
     if (window.__globe) {
       if (view === 'globe') window.__globe.resumeAnimation();
       else window.__globe.pauseAnimation();
@@ -362,14 +363,36 @@
   }
 
   // ===== Globe View =====
-  // A dependency-free orthographic globe drawn entirely on one 2D canvas.
-  const GLOBE_COUNTRIES = 'data/countries-lite.geojson';
-  const DEG = Math.PI / 180;
-  const GLOBE_MIN_ZOOM = 0.55;
-  const GLOBE_MAX_ZOOM = 12;
-  const GLOBE_ROTATION_SPEED = 0.00012;
+  // WebGL globe (globe.gl, vendored in lib/) with high-resolution Natural
+  // Earth vector geometry that remains sharp at every zoom level.
+  const GLOBE_COUNTRIES = 'data/countries.geojson';
+  const GLOBE_POLYGON_ALTITUDE = 0.003;
+  const GLOBE_MIN_ALTITUDE = 0.02;
+  const GLOBE_MAX_ALTITUDE = 12;
   let globeInited = false;
+  let globeLibraryPromise = null;
   let globeCountriesPromise = null;
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error(`Failed to load ${src}`));
+      document.head.appendChild(s);
+    });
+  }
+
+  function loadGlobeLibrary() {
+    if (window.Globe) return Promise.resolve();
+    if (!globeLibraryPromise) {
+      globeLibraryPromise = loadScript('lib/globe.gl.min.js').catch((err) => {
+        globeLibraryPromise = null;
+        throw err;
+      });
+    }
+    return globeLibraryPromise;
+  }
 
   function loadGlobeCountries() {
     if (!globeCountriesPromise) {
@@ -387,325 +410,302 @@
   }
 
   function prepareGlobeAssets() {
-    return loadGlobeCountries();
-  }
-
-  function globeLines(geojson) {
-    const lines = [];
-    (geojson.features || []).forEach(({ geometry }) => {
-      if (!geometry) return;
-      if (geometry.type === 'Polygon') {
-        geometry.coordinates.forEach((ring) => lines.push(ring));
-      } else if (geometry.type === 'MultiPolygon') {
-        geometry.coordinates.forEach((polygon) => {
-          polygon.forEach((ring) => lines.push(ring));
-        });
-      }
-    });
-    return lines;
-  }
-
-  function globePoint(lat, lng) {
-    const latRadians = Number(lat) * DEG;
-    const lngRadians = Number(lng) * DEG;
-    return {
-      sinLat: Math.sin(latRadians),
-      cosLat: Math.cos(latRadians),
-      sinLng: Math.sin(lngRadians),
-      cosLng: Math.cos(lngRadians),
-    };
+    return Promise.all([loadGlobeLibrary(), loadGlobeCountries()]);
   }
 
   async function loadGlobe() {
     if (globeInited) {
-      window.__globe.resumeAnimation();
-      refreshGlobeMarkers();
+      if (window.__globe) window.__globe.resumeAnimation();
+      if (refreshGlobeMarkers) refreshGlobeMarkers();
       return;
     }
     globeInited = true;
 
     const wrap = $('#globe-wrap');
-    const canvas = $('#globe-canvas');
+    const container = $('#globe-3d');
     const tooltip = $('#globe-tooltip');
     const stationsEl = $('#globe-stations');
-    const statsEl = $('#globe-stats');
-    const context = canvas.getContext('2d', { alpha: true });
 
-    const previousError = wrap.querySelector('.globe-error');
-    if (previousError) previousError.remove();
-    canvas.classList.remove('hidden');
     wrap.classList.add('is-loading');
+    container.classList.add('loading-placeholder');
+    container.innerHTML = '<div class="loader" aria-label="Loading globe"></div>';
 
-    let places;
-    let countryData;
+    let pts;
+    let countries;
     try {
-      [places, countryData] = await Promise.all([
+      const [places, , countryData] = await Promise.all([
         getPlaces(),
-        loadGlobeCountries().catch((err) => {
-          console.warn('Country outlines unavailable:', err.message);
-          return { features: [] };
-        }),
+        loadGlobeLibrary(),
+        loadGlobeCountries(),
       ]);
+      pts = places.filter((p) => Array.isArray(p.geo) && p.geo.length === 2);
+      countries = countryData;
     } catch (err) {
       console.error('Failed to load globe:', err);
       globeInited = false;
       wrap.classList.remove('is-loading');
-      canvas.classList.add('hidden');
-      const error = document.createElement('div');
-      error.className = 'globe-error empty-state';
-      error.innerHTML = '<p>Failed to load the globe. Please try again.</p>';
-      wrap.appendChild(error);
+      container.classList.remove('loading-placeholder');
+      container.innerHTML = '<div class="empty-state"><p>Failed to load the globe. Please refresh.</p></div>';
       return;
     }
 
-    const markers = places
-      .filter((place) => Array.isArray(place.geo) && place.geo.length === 2)
-      .map((place) => ({
-        place,
-        point: globePoint(place.geo[1], place.geo[0]),
-        radius: 1.15
-          + Math.min(1.8, Math.log2((Number(place.size) || 0) + 1) * 0.22)
-          + (place.boost ? 0.65 : 0),
-        visible: false,
-      }));
-    const outlines = globeLines(countryData).map((line) => (
-      line.map(([lng, lat]) => globePoint(lat, lng))
-    ));
-    const graticule = [];
-    for (let lat = -60; lat <= 60; lat += 30) {
-      const line = [];
-      for (let lng = -180; lng <= 180; lng += 4) line.push(globePoint(lat, lng));
-      graticule.push(line);
-    }
-    for (let lng = -150; lng <= 180; lng += 30) {
-      const line = [];
-      for (let lat = -90; lat <= 90; lat += 3) line.push(globePoint(lat, lng));
-      graticule.push(line);
-    }
-    const totalStations = markers.reduce(
-      (total, marker) => total + (Number(marker.place.size) || 0),
-      0,
-    );
-    statsEl.textContent = `${markers.length.toLocaleString()} places · ${totalStations.toLocaleString()} stations`;
-    wrap.classList.remove('is-loading');
+    container.classList.remove('loading-placeholder');
+    container.innerHTML = '';
 
-    const state = {
-      width: 1,
-      height: 1,
-      radius: 1,
-      centerX: 0,
-      centerY: 0,
-      lng: 8 * DEG,
-      lat: 25 * DEG,
-      zoom: 1,
-      running: true,
-      autoRotate: true,
-      frame: 0,
-      drawFrame: 0,
-      lastTime: 0,
-      hovered: null,
-    };
+    const initialRect = container.getBoundingClientRect();
+    const initialWidth = Math.max(1, Math.floor(initialRect.width));
+    const initialHeight = Math.max(1, Math.floor(initialRect.height));
+
+    // Keep the earth itself on the GPU. City markers are rendered by one 2D
+    // canvas pass below; generating 12,000 individual cylinders is both slower
+    // and makes their apparent size depend on camera distance.
+    let resolveGlobeReady;
+    const globeReady = new Promise((resolve) => {
+      resolveGlobeReady = resolve;
+    });
+    const globe = Globe({
+      rendererConfig: {
+        antialias: true,
+        alpha: true,
+        powerPreference: 'high-performance',
+      },
+    })(container)
+      .width(initialWidth)
+      .height(initialHeight)
+      .backgroundColor('rgba(0,0,0,0)')
+      .showAtmosphere(true)
+      .atmosphereColor('#93c5fd')
+      .atmosphereAltitude(0.14)
+      .enablePointerInteraction(false)
+      .polygonsData(countries.features)
+      .polygonCapColor(() => '#263b4f')
+      .polygonSideColor(() => 'rgba(7, 18, 31, 0.9)')
+      .polygonStrokeColor(() => 'rgba(154, 210, 235, 0.65)')
+      .polygonAltitude(GLOBE_POLYGON_ALTITUDE)
+      .polygonsTransitionDuration(0)
+      .onGlobeReady(resolveGlobeReady);
+
+    globe.globeMaterial().color.set('#071a2c');
+    globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    window.__globe = globe;
+
+    globe.pointOfView({ lat: 35, lng: 8, altitude: 1.85 }, 0);
+
+    const controls = globe.controls();
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.35;
+    // globe.gl uses a 100-unit sphere; keep OrbitControls and button zoom in
+    // the same broad altitude range.
+    controls.minDistance = 100 * (1 + GLOBE_MIN_ALTITUDE);
+    controls.maxDistance = 100 * (1 + GLOBE_MAX_ALTITUDE);
+    controls.addEventListener('start', () => {
+      controls.autoRotate = false;
+    });
+
+    const pointsCanvas = $('#globe-points');
+    const pointsContext = pointsCanvas.getContext('2d', { alpha: true });
+    const statsEl = $('#globe-stats');
+    const totalStations = pts.reduce((total, place) => total + (Number(place.size) || 0), 0);
+    statsEl.textContent = `${pts.length.toLocaleString()} places · ${totalStations.toLocaleString()} stations`;
+
+    // At a world view several nearby cities occupy the same few pixels. Keep
+    // the busiest one as the visual anchor and roll the density into its size.
+    // Finer levels are selected as the camera approaches the earth.
+    function clusterPlaces(cellSize) {
+      if (!cellSize) {
+        return pts.map((place) => ({
+          place,
+          placeCount: 1,
+          stationCount: Number(place.size) || 0,
+          boost: !!place.boost,
+        }));
+      }
+
+      const cells = new Map();
+      pts.forEach((place) => {
+        const lat = Number(place.geo[1]);
+        const lng = Number(place.geo[0]);
+        const key = `${Math.floor((lat + 90) / cellSize)}:${Math.floor((lng + 180) / cellSize)}`;
+        const stationCount = Number(place.size) || 0;
+        const score = stationCount + (place.boost ? 1000 : 0);
+        const marker = cells.get(key);
+
+        if (!marker) {
+          cells.set(key, {
+            place,
+            placeCount: 1,
+            stationCount,
+            boost: !!place.boost,
+            score,
+          });
+          return;
+        }
+
+        marker.placeCount += 1;
+        marker.stationCount += stationCount;
+        marker.boost = marker.boost || !!place.boost;
+        if (score > marker.score) {
+          marker.place = place;
+          marker.score = score;
+        }
+      });
+      return Array.from(cells.values());
+    }
+
+    const markerLevels = [
+      { maxAltitude: 0.42, markers: clusterPlaces(0) },
+      { maxAltitude: 0.85, markers: clusterPlaces(0.8) },
+      { maxAltitude: 1.5, markers: clusterPlaces(1.6) },
+      { maxAltitude: Infinity, markers: clusterPlaces(2.4) },
+    ];
+
+    let markerWidth = initialWidth;
+    let markerHeight = initialHeight;
+    let markerPixelRatio = 1;
+    let markerFrame = 0;
+    let hoveredPlace = null;
     const markerCells = new Map();
     const markerCellSize = 24;
 
-    function markerCellKey(cellX, cellY) {
-      return (cellX + 10000) * 20000 + cellY + 10000;
+    function resizePointsCanvas(width, height) {
+      markerWidth = width;
+      markerHeight = height;
+      markerPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+      const pixelWidth = Math.max(1, Math.round(width * markerPixelRatio));
+      const pixelHeight = Math.max(1, Math.round(height * markerPixelRatio));
+      if (pointsCanvas.width !== pixelWidth) pointsCanvas.width = pixelWidth;
+      if (pointsCanvas.height !== pixelHeight) pointsCanvas.height = pixelHeight;
     }
 
-    function resize() {
-      const rect = wrap.getBoundingClientRect();
-      const ratio = Math.min(window.devicePixelRatio || 1, 1.75);
-      state.width = Math.max(1, Math.floor(rect.width));
-      state.height = Math.max(1, Math.floor(rect.height));
-      state.centerX = state.width / 2;
-      state.centerY = state.height / 2;
-      state.radius = Math.min(state.width, state.height) * 0.39 * state.zoom;
-      canvas.width = Math.max(1, Math.round(state.width * ratio));
-      canvas.height = Math.max(1, Math.round(state.height * ratio));
-      canvas.style.width = `${state.width}px`;
-      canvas.style.height = `${state.height}px`;
-      context.setTransform(ratio, 0, 0, ratio, 0, 0);
-      draw();
-    }
+    function drawMarkers() {
+      markerFrame = 0;
+      const pov = globe.pointOfView();
+      const altitude = Math.max(0.01, pov.altitude || 0.01);
+      const level = markerLevels.find((item) => altitude <= item.maxAltitude);
+      const cameraLat = pov.lat * Math.PI / 180;
+      const cameraLng = pov.lng * Math.PI / 180;
+      const sinCameraLat = Math.sin(cameraLat);
+      const cosCameraLat = Math.cos(cameraLat);
+      const horizon = 1 / (1 + altitude) - 0.025;
+      const zoomScale = Math.max(0.9, Math.min(1.2, 1.14 - altitude * 0.07));
 
-    function projection() {
-      return {
-        sinLng: Math.sin(state.lng),
-        cosLng: Math.cos(state.lng),
-        sinTilt: Math.sin(state.lat),
-        cosTilt: Math.cos(state.lat),
-      };
-    }
-
-    function projectPoint(point, view, lift = 1) {
-      const sinDeltaLng = point.sinLng * view.cosLng - point.cosLng * view.sinLng;
-      const cosDeltaLng = point.cosLng * view.cosLng + point.sinLng * view.sinLng;
-      const x = point.cosLat * sinDeltaLng;
-      const z = point.cosLat * cosDeltaLng;
-      const tiltedY = point.sinLat * view.cosTilt - z * view.sinTilt;
-      const tiltedZ = point.sinLat * view.sinTilt + z * view.cosTilt;
-      return {
-        x: state.centerX + state.radius * lift * x,
-        y: state.centerY - state.radius * lift * tiltedY,
-        visible: tiltedZ > 0,
-      };
-    }
-
-    function drawLine(coordinates, view) {
-      let drawing = false;
-      coordinates.forEach((coordinate) => {
-        const projected = projectPoint(coordinate, view);
-        if (!projected.visible) {
-          drawing = false;
-          return;
-        }
-        if (drawing) context.lineTo(projected.x, projected.y);
-        else {
-          context.moveTo(projected.x, projected.y);
-          drawing = true;
-        }
-      });
-    }
-
-    function drawGraticule(view) {
-      context.beginPath();
-      graticule.forEach((line) => drawLine(line, view));
-      context.strokeStyle = 'rgba(125, 170, 210, 0.12)';
-      context.lineWidth = 0.75;
-      context.stroke();
-    }
-
-    function drawOutlines(view) {
-      context.beginPath();
-      outlines.forEach((line) => drawLine(line, view));
-      context.strokeStyle = 'rgba(151, 190, 222, 0.52)';
-      context.lineWidth = Math.max(0.65, Math.min(1.2, state.zoom));
-      context.stroke();
-    }
-
-    function drawMarkers(view) {
+      pointsContext.setTransform(markerPixelRatio, 0, 0, markerPixelRatio, 0, 0);
+      pointsContext.clearRect(0, 0, markerWidth, markerHeight);
+      pointsContext.beginPath();
       markerCells.clear();
-      context.beginPath();
-      markers.forEach((marker) => {
-        const point = projectPoint(marker.point, view, 1.012);
-        marker.visible = point.visible
-          && point.x >= -12 && point.x <= state.width + 12
-          && point.y >= -12 && point.y <= state.height + 12;
-        if (!marker.visible) return;
-        marker.x = point.x;
-        marker.y = point.y;
-        const cellX = Math.floor(point.x / markerCellSize);
-        const cellY = Math.floor(point.y / markerCellSize);
-        const cellKey = markerCellKey(cellX, cellY);
+
+      level.markers.forEach((marker) => {
+        const lat = marker.place.geo[1] * Math.PI / 180;
+        const lng = marker.place.geo[0] * Math.PI / 180;
+        const facing = Math.sin(lat) * sinCameraLat
+          + Math.cos(lat) * cosCameraLat * Math.cos(lng - cameraLng);
+        if (facing < horizon) return;
+
+        const screen = globe.getScreenCoords(
+          marker.place.geo[1],
+          marker.place.geo[0],
+          GLOBE_POLYGON_ALTITUDE,
+        );
+        if (
+          screen.x < -8 || screen.y < -8
+          || screen.x > markerWidth + 8 || screen.y > markerHeight + 8
+        ) return;
+
+        const density = Math.log2(marker.stationCount + marker.placeCount * 2 + 1);
+        const radius = (1.65 + Math.min(2.4, density * 0.32) + (marker.boost ? 0.7 : 0))
+          * zoomScale;
+        marker.x = screen.x;
+        marker.y = screen.y;
+        marker.radius = radius;
+        const cellX = Math.floor(screen.x / markerCellSize);
+        const cellY = Math.floor(screen.y / markerCellSize);
+        const cellKey = `${cellX}:${cellY}`;
         const cell = markerCells.get(cellKey);
         if (cell) cell.push(marker);
         else markerCells.set(cellKey, [marker]);
-        context.moveTo(point.x + marker.radius, point.y);
-        context.arc(point.x, point.y, marker.radius, 0, Math.PI * 2);
+        pointsContext.moveTo(screen.x + radius, screen.y);
+        pointsContext.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
       });
-      context.save();
-      context.globalCompositeOperation = 'lighter';
-      context.fillStyle = 'rgba(74, 246, 137, 0.94)';
-      context.shadowColor = 'rgba(65, 255, 137, 0.88)';
-      context.shadowBlur = 5;
-      context.fill();
-      context.restore();
 
-      if (state.hovered) {
-        const marker = state.hovered;
-        if (marker.visible) {
-          context.beginPath();
-          context.arc(marker.x, marker.y, 7, 0, Math.PI * 2);
-          context.strokeStyle = '#fff';
-          context.lineWidth = 1.5;
-          context.stroke();
-        }
+      pointsContext.save();
+      pointsContext.globalCompositeOperation = 'lighter';
+      pointsContext.fillStyle = 'rgba(74, 246, 137, 0.95)';
+      pointsContext.shadowColor = 'rgba(65, 255, 137, 0.9)';
+      pointsContext.shadowBlur = 5;
+      pointsContext.fill();
+      pointsContext.restore();
+
+      if (hoveredPlace) {
+        const screen = globe.getScreenCoords(
+          hoveredPlace.geo[1],
+          hoveredPlace.geo[0],
+          GLOBE_POLYGON_ALTITUDE,
+        );
+        pointsContext.beginPath();
+        pointsContext.arc(screen.x, screen.y, 8, 0, Math.PI * 2);
+        pointsContext.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+        pointsContext.lineWidth = 1.5;
+        pointsContext.stroke();
       }
     }
 
-    function draw() {
-      state.drawFrame = 0;
-      const view = projection();
-      context.clearRect(0, 0, state.width, state.height);
-
-      context.save();
-      context.shadowColor = 'rgba(73, 225, 145, 0.3)';
-      context.shadowBlur = 28;
-      const ocean = context.createRadialGradient(
-        state.centerX - state.radius * 0.28,
-        state.centerY - state.radius * 0.35,
-        state.radius * 0.08,
-        state.centerX,
-        state.centerY,
-        state.radius,
-      );
-      ocean.addColorStop(0, '#183653');
-      ocean.addColorStop(0.58, '#0b2035');
-      ocean.addColorStop(1, '#050d18');
-      context.beginPath();
-      context.arc(state.centerX, state.centerY, state.radius, 0, Math.PI * 2);
-      context.fillStyle = ocean;
-      context.fill();
-      context.restore();
-
-      context.save();
-      context.beginPath();
-      context.arc(state.centerX, state.centerY, state.radius, 0, Math.PI * 2);
-      context.clip();
-      drawGraticule(view);
-      drawOutlines(view);
-      drawMarkers(view);
-      context.restore();
-
-      context.beginPath();
-      context.arc(state.centerX, state.centerY, state.radius, 0, Math.PI * 2);
-      context.strokeStyle = 'rgba(103, 232, 164, 0.34)';
-      context.lineWidth = 1.5;
-      context.stroke();
+    function scheduleMarkerDraw() {
+      if (currentView !== 'globe') return;
+      if (!markerFrame) markerFrame = requestAnimationFrame(drawMarkers);
     }
 
-    function scheduleDraw() {
-      if (!state.drawFrame) state.drawFrame = requestAnimationFrame(draw);
-    }
+    refreshGlobeMarkers = scheduleMarkerDraw;
+    resizePointsCanvas(initialWidth, initialHeight);
+    controls.addEventListener('change', scheduleMarkerDraw);
+    globeReady.then(() => {
+      requestAnimationFrame(() => {
+        drawMarkers();
+        requestAnimationFrame(() => wrap.classList.remove('is-loading'));
+      });
+    });
+    if (currentView !== 'globe') globe.pauseAnimation();
 
-    function animate(time) {
-      state.frame = 0;
-      if (!state.running || currentView !== 'globe') return;
-      if (state.autoRotate && state.lastTime) {
-        state.lng += Math.min(40, time - state.lastTime) * GLOBE_ROTATION_SPEED;
-        draw();
+    // Use the globe's cheap sphere projection for interaction instead of
+    // enabling polygon raycasting over the complete country mesh.
+    let downX = 0;
+    let downY = 0;
+    container.addEventListener('pointerdown', (e) => {
+      downX = e.clientX;
+      downY = e.clientY;
+    });
+    container.addEventListener('pointerup', (e) => {
+      if (Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY) > 6) return;
+      const hit = markerAt(e);
+      if (hit) {
+        showPlaceStations(hit, stationsEl, 'Back to Globe', () => {
+          stationsEl.classList.add('hidden');
+        });
+        stationsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-      state.lastTime = time;
-      state.frame = requestAnimationFrame(animate);
-    }
+    });
 
-    function resumeAnimation() {
-      state.running = true;
-      state.lastTime = 0;
-      if (!state.frame) state.frame = requestAnimationFrame(animate);
-    }
-
-    function pauseAnimation() {
-      state.running = false;
-      if (state.frame) cancelAnimationFrame(state.frame);
-      state.frame = 0;
-    }
-
-    function markerAt(x, y) {
+    function markerAt(event) {
+      const rect = container.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
       let nearest = null;
-      let nearestDistance = 12 * 12;
+      let nearestDistance = Infinity;
+
       const cellX = Math.floor(x / markerCellSize);
       const cellY = Math.floor(y / markerCellSize);
       for (let offsetX = -1; offsetX <= 1; offsetX++) {
         for (let offsetY = -1; offsetY <= 1; offsetY++) {
-          const cell = markerCells.get(markerCellKey(cellX + offsetX, cellY + offsetY)) || [];
+          const cell = markerCells.get(`${cellX + offsetX}:${cellY + offsetY}`) || [];
           cell.forEach((marker) => {
             const dx = marker.x - x;
             const dy = marker.y - y;
             const distance = dx * dx + dy * dy;
-            if (distance < nearestDistance) {
+            const hitRadius = Math.max(10, marker.radius + 4);
+            if (distance <= hitRadius * hitRadius && distance < nearestDistance) {
+              nearest = marker.place;
               nearestDistance = distance;
-              nearest = marker;
             }
           });
         }
@@ -713,108 +713,85 @@
       return nearest;
     }
 
-    function pointerPosition(event) {
-      const rect = canvas.getBoundingClientRect();
-      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    }
-
-    function showTooltip(marker, event) {
-      if (!marker) {
-        tooltip.classList.add('hidden');
-        return;
-      }
-      const place = marker.place;
-      tooltip.textContent = `${place.title}, ${place.country} · ${place.size} station${place.size === 1 ? '' : 's'}`;
-      const rect = wrap.getBoundingClientRect();
-      tooltip.style.left = `${event.clientX - rect.left + 14}px`;
-      tooltip.style.top = `${event.clientY - rect.top - 10}px`;
-      tooltip.classList.remove('hidden');
-    }
-
-    let pointer = null;
-    canvas.addEventListener('pointerdown', (event) => {
-      state.autoRotate = false;
-      pointer = {
-        id: event.pointerId,
-        x: event.clientX,
-        y: event.clientY,
-        startX: event.clientX,
-        startY: event.clientY,
-        dragged: false,
-      };
-      canvas.setPointerCapture(event.pointerId);
-      canvas.classList.add('is-dragging');
-      tooltip.classList.add('hidden');
-    });
-
-    canvas.addEventListener('pointermove', (event) => {
-      if (pointer && pointer.id === event.pointerId) {
-        const dx = event.clientX - pointer.x;
-        const dy = event.clientY - pointer.y;
-        if (Math.abs(event.clientX - pointer.startX) + Math.abs(event.clientY - pointer.startY) > 5) {
-          pointer.dragged = true;
+    let hoverFrame = 0;
+    let hoverEvent = null;
+    function updateHover() {
+      hoverFrame = 0;
+      const e = hoverEvent;
+      if (!e) return;
+      const hit = markerAt(e);
+      if (hit) {
+        if (hoveredPlace !== hit) {
+          hoveredPlace = hit;
+          scheduleMarkerDraw();
         }
-        state.lng -= dx / state.radius;
-        state.lat = Math.max(-1.35, Math.min(1.35, state.lat + dy / state.radius));
-        pointer.x = event.clientX;
-        pointer.y = event.clientY;
-        scheduleDraw();
-        return;
+        tooltip.textContent = `${hit.title}, ${hit.country} · ${hit.size} station${hit.size === 1 ? '' : 's'}`;
+        const wrect = wrap.getBoundingClientRect();
+        tooltip.style.left = `${e.clientX - wrect.left + 14}px`;
+        tooltip.style.top = `${e.clientY - wrect.top - 10}px`;
+        tooltip.classList.remove('hidden');
+      } else {
+        if (hoveredPlace) {
+          hoveredPlace = null;
+          scheduleMarkerDraw();
+        }
+        tooltip.classList.add('hidden');
       }
-      const position = pointerPosition(event);
-      const hovered = markerAt(position.x, position.y);
-      if (hovered !== state.hovered) {
-        state.hovered = hovered;
-        scheduleDraw();
-      }
-      canvas.classList.toggle('has-hit', !!state.hovered);
-      showTooltip(state.hovered, event);
-    });
-
-    canvas.addEventListener('pointerup', (event) => {
-      if (!pointer || pointer.id !== event.pointerId) return;
-      const wasDragged = pointer.dragged;
-      pointer = null;
-      canvas.classList.remove('is-dragging');
-      canvas.releasePointerCapture(event.pointerId);
-      if (wasDragged) return;
-      const position = pointerPosition(event);
-      const marker = markerAt(position.x, position.y);
-      if (!marker) return;
-      showPlaceStations(marker.place, stationsEl, 'Back to Globe', () => {
-        stationsEl.classList.add('hidden');
-      });
-      stationsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-
-    canvas.addEventListener('pointerleave', () => {
-      if (pointer) return;
-      state.hovered = null;
-      canvas.classList.remove('has-hit');
-      tooltip.classList.add('hidden');
-      scheduleDraw();
-    });
-
-    function setZoom(zoom) {
-      state.autoRotate = false;
-      state.zoom = Math.max(GLOBE_MIN_ZOOM, Math.min(GLOBE_MAX_ZOOM, zoom));
-      state.radius = Math.min(state.width, state.height) * 0.39 * state.zoom;
-      scheduleDraw();
     }
+    container.addEventListener('pointermove', (e) => {
+      hoverEvent = { clientX: e.clientX, clientY: e.clientY };
+      if (!hoverFrame) hoverFrame = requestAnimationFrame(updateHover);
+    });
 
-    canvas.addEventListener('wheel', (event) => {
-      event.preventDefault();
-      setZoom(state.zoom * Math.exp(-event.deltaY * 0.001));
-    }, { passive: false });
-    $('#globe-zoom-in').addEventListener('click', () => setZoom(state.zoom * 1.25));
-    $('#globe-zoom-out').addEventListener('click', () => setZoom(state.zoom / 1.25));
+    container.addEventListener('pointerleave', () => {
+      hoverEvent = null;
+      if (hoverFrame) cancelAnimationFrame(hoverFrame);
+      hoverFrame = 0;
+      hoveredPlace = null;
+      scheduleMarkerDraw();
+      tooltip.classList.add('hidden');
+    });
+    container.addEventListener('pointerdown', () => tooltip.classList.add('hidden'));
 
-    const resizeObserver = new ResizeObserver(resize);
-    resizeObserver.observe(wrap);
-    window.__globe = { pauseAnimation, resumeAnimation };
-    refreshGlobeMarkers = draw;
-    resize();
-    resumeAnimation();
+    let renderedWidth = initialWidth;
+    let renderedHeight = initialHeight;
+    let resizeFrame = 0;
+    const resizeObserver = new ResizeObserver(() => {
+      cancelAnimationFrame(resizeFrame);
+
+      resizeFrame = requestAnimationFrame(() => {
+        const rect = container.getBoundingClientRect();
+        const width = Math.max(1, Math.floor(rect.width));
+        const height = Math.max(1, Math.floor(rect.height));
+
+        // Ignore insignificant one-pixel layout fluctuations.
+        if (
+          Math.abs(width - renderedWidth) < 2 &&
+          Math.abs(height - renderedHeight) < 2
+        ) {
+          return;
+        }
+
+        renderedWidth = width;
+        renderedHeight = height;
+        globe.width(width).height(height);
+        resizePointsCanvas(width, height);
+        scheduleMarkerDraw();
+      });
+    });
+    resizeObserver.observe(container);
+
+    // Zoom buttons (wheel/pinch zoom is built into the controls)
+    function zoomBy(factor) {
+      const pov = globe.pointOfView();
+      const altitude = Math.max(
+        GLOBE_MIN_ALTITUDE,
+        Math.min(GLOBE_MAX_ALTITUDE, pov.altitude * factor),
+      );
+      globe.pointOfView({ altitude }, 300);
+    }
+    $('#globe-zoom-in').addEventListener('click', () => zoomBy(0.65));
+    $('#globe-zoom-out').addEventListener('click', () => zoomBy(1 / 0.65));
   }
 
   // ===== Search =====
