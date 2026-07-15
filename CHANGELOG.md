@@ -60,6 +60,8 @@ rather than by version number. Newest first.
 - **Polished imagery credit** — the Esri attribution now uses a compact glass
   pill with clean spacing and responsive sizing instead of an overlapping info
   toggle and text box.
+- **Stable globe viewport** — opening station results no longer shrinks or
+  resizes the map; result cards flow below its fixed desktop or mobile height.
 
 ### Added
 
