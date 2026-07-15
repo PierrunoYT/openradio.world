@@ -10,32 +10,23 @@ rather than by version number. Newest first.
 
 ### Changed
 
-- **Reliable globe.gl renderer** — the globe uses a locally vendored release
-  of the established globe.gl WebGL library instead of a custom globe engine.
-- **High-resolution vector Earth** — the full Natural Earth country dataset
-  is rendered as GPU-accelerated globe.gl polygons, keeping coastlines and
-  borders sharp at every zoom level without a stretched raster Earth image.
-- **Radio Garden-style place markers** — all 12,326 places are represented by
-  bright screen-space points. Geographic level-of-detail clustering keeps the
-  world view readable and progressively reveals every place while zooming.
-- **Fast rendering and interaction** — the Earth stays on the GPU while city
-  markers are drawn in one Canvas overlay. Expensive scene raycasting remains
-  disabled, and hover/click use a screen-space marker index with
-  animation-frame throttling.
-- **Synchronized markers** — the globe and its first marker frame are revealed
-  together after the vector Earth is ready, preventing the globe from
-  appearing before its green place dots.
-- **Accurate marker selection** — dots and hit testing now use the same surface
-  projection and screen-space marker index, so hover and clicks stay aligned
-  with the visible green dots at close zoom and clustered world views.
-- **Expanded zoom range** — wheel, pinch, and button zoom now share an
-  altitude range of `0.02` to `12`, allowing near-surface detail and a much
-  farther world view without the previous camera restriction.
+- **CesiumJS renderer** — the globe now uses the established CesiumJS WGS84
+  engine instead of a custom renderer or globe.gl implementation.
+- **High-resolution satellite Earth** — Esri World Imagery is loaded as a
+  level-of-detail tile pyramid up to level 19, so finer imagery streams in as
+  the camera approaches instead of stretching one global image.
+- **Radio Garden-style place markers** — all 12,326 places are rendered in one
+  Cesium GPU point collection with station-weighted sizes.
+- **Accurate interaction** — markers and the WGS84 Earth share one Cesium
+  scene, so native GPU picking keeps hover and clicks aligned at every zoom.
+- **Synchronized loading** — the loader remains visible until initial imagery
+  tiles and station points have rendered together.
+- **Expanded zoom range** — wheel, pinch, and button zoom support camera
+  heights from 30 km to 80,000 km.
 - **Lower background cost** — animation stops whenever another app view is
   open, and render resolution is capped on high-DPI screens.
-- **Faster first and offline open** — the library and local country geometry
-  warm during browser idle time, and offline globe loading only needs the
-  places snapshot rather than the full station catalog.
+- **Faster first open** — CesiumJS warms during browser idle time, while the
+  globe still loads only the places snapshot rather than the station catalog.
 
 ### Added
 
