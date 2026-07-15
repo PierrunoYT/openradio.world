@@ -910,6 +910,7 @@
           );
         }
         const templateVertexCount = template.length / 4;
+        const quadTemplate = [-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1];
 
         const INSTANCE_STRIDE = 7;
         const instanceData = new Float32Array(markers.length * INSTANCE_STRIDE);
@@ -948,6 +949,48 @@ void main() {
   color = mix(color, vec3(1.0, 0.75, 0.88), v_up * v_up * 0.35);
   fragColor = vec4(color, 1.0);
 }`;
+        const dotFragmentSource = `#version 300 es
+precision highp float;
+in vec2 v_corner;
+flat in vec3 v_pick;
+uniform float u_pick_mode;
+out vec4 fragColor;
+void main() {
+  float dist = length(v_corner);
+  if (dist > 1.0) discard;
+  if (u_pick_mode > 0.5) {
+    fragColor = vec4(v_pick, 1.0);
+    return;
+  }
+  float alpha = 1.0 - smoothstep(0.55, 1.0, dist);
+  vec3 color = mix(vec3(1.0, 0.62, 0.8), vec3(1.0, 0.176, 0.471), smoothstep(0.0, 0.9, dist));
+  fragColor = vec4(color * alpha, alpha);
+}`;
+
+        function buildProgram(gl, vertexSource, fragSource, attributeNames) {
+          const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+          gl.shaderSource(vertexShader, vertexSource);
+          gl.compileShader(vertexShader);
+          const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+          gl.shaderSource(fragmentShader, fragSource);
+          gl.compileShader(fragmentShader);
+          const program = gl.createProgram();
+          gl.attachShader(program, vertexShader);
+          gl.attachShader(program, fragmentShader);
+          attributeNames.forEach((name, location) => gl.bindAttribLocation(program, location, name));
+          gl.linkProgram(program);
+          gl.deleteShader(vertexShader);
+          gl.deleteShader(fragmentShader);
+          if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error('Spike layer shader failed to link:', gl.getProgramInfoLog(program));
+          }
+          const uniforms = {};
+          [
+            'u_projection_matrix', 'u_projection_fallback_matrix', 'u_projection_tile_mercator_coords',
+            'u_projection_clipping_plane', 'u_projection_transition', 'u_pick_mode', 'u_viewport',
+          ].forEach((name) => { uniforms[name] = gl.getUniformLocation(program, name); });
+          return { program, uniforms };
+        }
 
         return {
           id: 'place-spikes',
@@ -961,6 +1004,9 @@ void main() {
             this.templateBuffer = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, this.templateBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(template), gl.STATIC_DRAW);
+            this.quadBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quadTemplate), gl.STATIC_DRAW);
             this.instanceBuffer = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, instanceData, gl.STATIC_DRAW);
@@ -968,20 +1014,25 @@ void main() {
           },
 
           onRemove(mapInstance, gl) {
-            this.programs.forEach((entry) => gl.deleteProgram(entry.program));
+            this.programs.forEach((entry) => {
+              gl.deleteProgram(entry.spike.program);
+              gl.deleteProgram(entry.dot.program);
+            });
             this.programs.clear();
-            if (this.vao) gl.deleteVertexArray(this.vao);
+            if (this.spikeVao) gl.deleteVertexArray(this.spikeVao);
+            if (this.dotVao) gl.deleteVertexArray(this.dotVao);
             if (this.templateBuffer) gl.deleteBuffer(this.templateBuffer);
+            if (this.quadBuffer) gl.deleteBuffer(this.quadBuffer);
             if (this.instanceBuffer) gl.deleteBuffer(this.instanceBuffer);
             if (this.pickTexture) gl.deleteTexture(this.pickTexture);
             if (this.pickDepth) gl.deleteRenderbuffer(this.pickDepth);
             if (this.pickFramebuffer) gl.deleteFramebuffer(this.pickFramebuffer);
           },
 
-          getProgram(gl, shaderData) {
+          getPrograms(gl, shaderData) {
             const cached = this.programs.get(shaderData.variantName);
             if (cached) return cached;
-            const vertexSource = `#version 300 es
+            const spikeVertexSource = `#version 300 es
 ${shaderData.vertexShaderPrelude}
 ${shaderData.define}
 in vec2 a_offset;
@@ -999,45 +1050,35 @@ void main() {
   v_shade = a_shade;
   v_pick = a_pick;
 }`;
-            const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-            gl.shaderSource(vertexShader, vertexSource);
-            gl.compileShader(vertexShader);
-            const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-            gl.shaderSource(fragmentShader, fragmentSource);
-            gl.compileShader(fragmentShader);
-            const program = gl.createProgram();
-            gl.attachShader(program, vertexShader);
-            gl.attachShader(program, fragmentShader);
-            gl.bindAttribLocation(program, 0, 'a_offset');
-            gl.bindAttribLocation(program, 1, 'a_up');
-            gl.bindAttribLocation(program, 2, 'a_shade');
-            gl.bindAttribLocation(program, 3, 'a_center');
-            gl.bindAttribLocation(program, 4, 'a_pick');
-            gl.linkProgram(program);
-            gl.deleteShader(vertexShader);
-            gl.deleteShader(fragmentShader);
-            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-              console.error('Spike layer shader failed to link:', gl.getProgramInfoLog(program));
-            }
+            const dotVertexSource = `#version 300 es
+${shaderData.vertexShaderPrelude}
+${shaderData.define}
+in vec2 a_corner;
+in vec4 a_center;
+in vec3 a_pick;
+uniform vec2 u_viewport;
+out vec2 v_corner;
+flat out vec3 v_pick;
+void main() {
+  vec4 tip = projectTileFor3D(a_center.xy, a_center.w);
+  float radiusPixels = 3.5 + (a_center.w - 160000.0) / 240000.0 * 3.0;
+  tip.xy += a_corner * radiusPixels * 2.0 * tip.w / u_viewport;
+  gl_Position = tip;
+  v_corner = a_corner;
+  v_pick = a_pick;
+}`;
             const entry = {
-              program,
-              uniforms: {
-                projectionMatrix: gl.getUniformLocation(program, 'u_projection_matrix'),
-                fallbackMatrix: gl.getUniformLocation(program, 'u_projection_fallback_matrix'),
-                tileMercatorCoords: gl.getUniformLocation(program, 'u_projection_tile_mercator_coords'),
-                clippingPlane: gl.getUniformLocation(program, 'u_projection_clipping_plane'),
-                transition: gl.getUniformLocation(program, 'u_projection_transition'),
-                pickMode: gl.getUniformLocation(program, 'u_pick_mode'),
-              },
+              spike: buildProgram(gl, spikeVertexSource, fragmentSource, ['a_offset', 'a_up', 'a_shade', 'a_center', 'a_pick']),
+              dot: buildProgram(gl, dotVertexSource, dotFragmentSource, ['a_corner', 'a_center', 'a_pick']),
             };
             this.programs.set(shaderData.variantName, entry);
             return entry;
           },
 
-          getVao(gl) {
-            if (this.vao) return this.vao;
-            this.vao = gl.createVertexArray();
-            gl.bindVertexArray(this.vao);
+          getSpikeVao(gl) {
+            if (this.spikeVao) return this.spikeVao;
+            this.spikeVao = gl.createVertexArray();
+            gl.bindVertexArray(this.spikeVao);
             gl.bindBuffer(gl.ARRAY_BUFFER, this.templateBuffer);
             gl.enableVertexAttribArray(0);
             gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 16, 0);
@@ -1054,21 +1095,56 @@ void main() {
             gl.vertexAttribDivisor(4, 1);
             gl.bindVertexArray(null);
             gl.bindBuffer(gl.ARRAY_BUFFER, null);
-            return this.vao;
+            return this.spikeVao;
           },
 
-          drawSpikes(gl, entry, args, pickMode) {
-            const projection = args.defaultProjectionData;
-            gl.useProgram(entry.program);
-            gl.uniformMatrix4fv(entry.uniforms.projectionMatrix, false, projection.mainMatrix);
-            gl.uniformMatrix4fv(entry.uniforms.fallbackMatrix, false, projection.fallbackMatrix);
-            gl.uniform4f(entry.uniforms.tileMercatorCoords, ...projection.tileMercatorCoords);
-            gl.uniform4f(entry.uniforms.clippingPlane, ...projection.clippingPlane);
-            gl.uniform1f(entry.uniforms.transition, projection.projectionTransition);
-            gl.uniform1f(entry.uniforms.pickMode, pickMode);
-            gl.bindVertexArray(this.getVao(gl));
-            gl.drawArraysInstanced(gl.TRIANGLES, 0, templateVertexCount, markers.length);
+          getDotVao(gl) {
+            if (this.dotVao) return this.dotVao;
+            this.dotVao = gl.createVertexArray();
+            gl.bindVertexArray(this.dotVao);
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
+            gl.enableVertexAttribArray(0);
+            gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 8, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
+            gl.enableVertexAttribArray(1);
+            gl.vertexAttribPointer(1, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, 0);
+            gl.vertexAttribDivisor(1, 1);
+            gl.enableVertexAttribArray(2);
+            gl.vertexAttribPointer(2, 3, gl.FLOAT, false, INSTANCE_STRIDE * 4, 16);
+            gl.vertexAttribDivisor(2, 1);
             gl.bindVertexArray(null);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+            return this.dotVao;
+          },
+
+          applyProjection(gl, programEntry, args, pickMode, viewportWidth, viewportHeight) {
+            const projection = args.defaultProjectionData;
+            const uniforms = programEntry.uniforms;
+            gl.useProgram(programEntry.program);
+            gl.uniformMatrix4fv(uniforms.u_projection_matrix, false, projection.mainMatrix);
+            gl.uniformMatrix4fv(uniforms.u_projection_fallback_matrix, false, projection.fallbackMatrix);
+            gl.uniform4f(uniforms.u_projection_tile_mercator_coords, ...projection.tileMercatorCoords);
+            gl.uniform4f(uniforms.u_projection_clipping_plane, ...projection.clippingPlane);
+            gl.uniform1f(uniforms.u_projection_transition, projection.projectionTransition);
+            gl.uniform1f(uniforms.u_pick_mode, pickMode);
+            if (uniforms.u_viewport) gl.uniform2f(uniforms.u_viewport, viewportWidth, viewportHeight);
+          },
+
+          drawScene(gl, programs, args, pickMode, viewportWidth, viewportHeight) {
+            this.applyProjection(gl, programs.spike, args, pickMode, viewportWidth, viewportHeight);
+            gl.bindVertexArray(this.getSpikeVao(gl));
+            gl.drawArraysInstanced(gl.TRIANGLES, 0, templateVertexCount, markers.length);
+            this.applyProjection(gl, programs.dot, args, pickMode, viewportWidth, viewportHeight);
+            if (!pickMode) {
+              gl.enable(gl.BLEND);
+              gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+              gl.depthMask(false);
+            }
+            gl.bindVertexArray(this.getDotVao(gl));
+            gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, markers.length);
+            gl.bindVertexArray(null);
+            gl.disable(gl.BLEND);
+            gl.depthMask(true);
           },
 
           ensurePickTarget(gl) {
@@ -1111,7 +1187,7 @@ void main() {
             gl.clearColor(0, 0, 0, 0);
             gl.clearDepth(1);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-            this.drawSpikes(gl, entry, args, 1);
+            this.drawScene(gl, entry, args, 1, this.pickWidth, this.pickHeight);
             const pixelX = Math.min(
               this.pickWidth - 1,
               Math.max(0, Math.round(pick.point.x * scaleX / PICK_DOWNSCALE)),
@@ -1130,13 +1206,13 @@ void main() {
           },
 
           render(gl, args) {
-            const entry = this.getProgram(gl, args.shaderData);
+            const entry = this.getPrograms(gl, args.shaderData);
             gl.enable(gl.DEPTH_TEST);
             gl.depthFunc(gl.LEQUAL);
             gl.depthMask(true);
             gl.disable(gl.BLEND);
             gl.disable(gl.CULL_FACE);
-            this.drawSpikes(gl, entry, args, 0);
+            this.drawScene(gl, entry, args, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
             if (this.pendingPick) this.resolvePick(gl, entry, args);
           },
 
