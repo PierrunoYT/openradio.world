@@ -158,6 +158,10 @@
             <div class="globe-loader"><div class="loader" aria-label="Loading globe"></div></div>
             <div id="globe-tooltip" class="hidden"></div>
             <div id="globe-stats" aria-live="polite">Loading places…</div>
+            <div id="globe-search">
+              <input type="text" id="globe-search-input" placeholder="Find a place…" autocomplete="off" aria-label="Find a place on the globe" role="combobox" aria-expanded="false" aria-controls="globe-search-results" />
+              <div id="globe-search-results" class="hidden" role="listbox"></div>
+            </div>
             <div id="globe-hint">Drag to spin &bull; Scroll to zoom &bull; Click a city to tune in</div>
             <div id="globe-zoom">
               <button id="globe-zoom-in" aria-label="Zoom in">+</button>
@@ -258,6 +262,6 @@
   </div>
 
   <audio id="audio-player" preload="none"></audio>
-  <script src="app.js?v=globe-center-1"></script>
+  <script src="app.js?v=globe-search-1"></script>
 </body>
 </html>

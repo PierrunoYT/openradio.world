@@ -1276,6 +1276,119 @@ void main() {
         });
       });
 
+      // Search box overlay: type a country/city and fly the camera there.
+      // Guarded: a cached index.html may not contain this markup yet.
+      {
+        const searchBox = $('#globe-search');
+        const searchInputEl = $('#globe-search-input');
+        const resultsEl = $('#globe-search-results');
+        if (searchBox && searchInputEl && resultsEl) {
+          let activeIndex = -1;
+          let currentMatches = [];
+
+          const updateActive = () => {
+            resultsEl.querySelectorAll('.globe-search-result').forEach((el, i) => {
+              el.classList.toggle('active', i === activeIndex);
+            });
+          };
+
+          const closeResults = () => {
+            resultsEl.classList.add('hidden');
+            resultsEl.innerHTML = '';
+            searchInputEl.setAttribute('aria-expanded', 'false');
+            activeIndex = -1;
+            currentMatches = [];
+          };
+
+          const selectPlace = (place) => {
+            stopAutoRotate();
+            map.flyTo({ center: place.geo, zoom: Math.max(2.8, map.getZoom()), pitch: 20, duration: 1600 });
+            showPlaceStations(place, stationsEl, 'Back to Globe', () => {
+              stationsEl.classList.add('hidden');
+            }, { scroll: true });
+            closeResults();
+            searchInputEl.value = place.title;
+            searchInputEl.blur();
+          };
+
+          const renderResults = (matches) => {
+            currentMatches = matches;
+            activeIndex = -1;
+            if (!matches.length) {
+              resultsEl.innerHTML = '<div class="globe-search-result"><span class="meta">No places found</span></div>';
+            } else {
+              resultsEl.innerHTML = matches
+                .map(
+                  (place, i) => `
+                    <div class="globe-search-result" data-idx="${i}" role="option">
+                      <span class="name">${escapeHtml(place.title)}</span>
+                      <span class="meta">${escapeHtml(place.country)} · ${place.size} station${place.size === 1 ? '' : 's'}</span>
+                    </div>
+                  `,
+                )
+                .join('');
+            }
+            resultsEl.classList.remove('hidden');
+            searchInputEl.setAttribute('aria-expanded', 'true');
+          };
+
+          const runQuery = (raw) => {
+            const q = raw.trim().toLowerCase();
+            if (!q) {
+              closeResults();
+              return;
+            }
+            const scored = [];
+            for (const place of markers) {
+              const title = place.title.toLowerCase();
+              const country = (place.country || '').toLowerCase();
+              let score;
+              if (title.startsWith(q)) score = 0;
+              else if (country.startsWith(q)) score = 1;
+              else if (title.includes(q)) score = 2;
+              else if (country.includes(q)) score = 3;
+              else continue;
+              scored.push({ place, score });
+            }
+            scored.sort((a, b) => a.score - b.score || (Number(b.place.size) || 0) - (Number(a.place.size) || 0));
+            renderResults(scored.slice(0, 8).map((s) => s.place));
+          };
+
+          searchInputEl.addEventListener('input', (event) => runQuery(event.target.value));
+
+          searchInputEl.addEventListener('keydown', (event) => {
+            if (!currentMatches.length) return;
+            if (event.key === 'ArrowDown') {
+              event.preventDefault();
+              activeIndex = Math.min(activeIndex + 1, currentMatches.length - 1);
+              updateActive();
+            } else if (event.key === 'ArrowUp') {
+              event.preventDefault();
+              activeIndex = Math.max(activeIndex - 1, 0);
+              updateActive();
+            } else if (event.key === 'Enter') {
+              event.preventDefault();
+              selectPlace(currentMatches[activeIndex >= 0 ? activeIndex : 0]);
+            } else if (event.key === 'Escape') {
+              closeResults();
+              searchInputEl.blur();
+            }
+          });
+
+          resultsEl.addEventListener('click', (event) => {
+            const row = event.target.closest('.globe-search-result');
+            if (!row || row.dataset.idx === undefined) return;
+            const idx = Number(row.dataset.idx);
+            if (currentMatches[idx]) selectPlace(currentMatches[idx]);
+          });
+
+          document.addEventListener('click', (event) => {
+            if (searchBox.contains(event.target)) return;
+            closeResults();
+          });
+        }
+      }
+
       await Promise.race([
         map.once('idle'),
         new Promise((resolve) => setTimeout(resolve, 8000)),

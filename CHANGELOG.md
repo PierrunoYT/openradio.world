@@ -8,6 +8,16 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Find a place on the globe** — the globe was drag/scroll-only with no
+  way to jump straight to a country or city, so locating a specific place
+  meant manually spinning and zooming. A search box in the globe's
+  top-right corner now matches against all 12,326 places as you type
+  (prioritizing name matches, then country matches, ranked by station
+  count), and picking a result flies the camera there and opens its
+  station list — the same flow as clicking a dot directly. Supports
+  arrow-key navigation, Enter to pick the top match, and Escape/outside
+  click to dismiss. Verified in a headless browser at desktop and mobile
+  sizes.
 - **Open Graph link-preview image copy fixed** — the redesign re-rendered
   `assets/og-image.png` in the new amber-on-navy style but kept the old
   tagline ("Listen live to radio stations from every corner of the

@@ -1201,6 +1201,85 @@ input[type="text"] {
   pointer-events: none;
 }
 
+#globe-search {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 4;
+  width: min(230px, calc(100% - 28px));
+}
+
+#globe-search input {
+  width: 100%;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  background: rgba(17, 22, 36, 0.88);
+  color: var(--text-hi);
+  font-size: 0.85rem;
+  font-family: inherit;
+  backdrop-filter: blur(8px);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+#globe-search input::placeholder {
+  color: var(--text-low);
+}
+
+#globe-search input:focus {
+  outline: none;
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px var(--amber-soft);
+}
+
+#globe-search-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: rgba(7, 10, 19, 0.94);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-lg);
+}
+
+#globe-search-results.hidden {
+  display: none;
+}
+
+.globe-search-result {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+
+.globe-search-result:last-child {
+  border-bottom: none;
+}
+
+.globe-search-result:hover,
+.globe-search-result.active {
+  background: var(--amber-soft);
+}
+
+.globe-search-result .name {
+  color: var(--text-hi);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.globe-search-result .meta {
+  color: var(--text-low);
+  font-size: 0.72rem;
+}
+
 #globe-tooltip {
   position: absolute;
   pointer-events: none;
@@ -1362,6 +1441,18 @@ input[type="text"] {
   #globe-stats {
     top: 10px;
     left: 10px;
+  }
+
+  #globe-search {
+    top: 10px;
+    right: 10px;
+    width: 130px;
+  }
+
+  #globe-search input {
+    height: 34px;
+    padding: 0 10px;
+    font-size: 0.78rem;
   }
 
   #globe-3d .maplibregl-ctrl-attrib {
