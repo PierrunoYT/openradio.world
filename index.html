@@ -88,6 +88,17 @@
               <button id="globe-zoom-in" aria-label="Zoom in">+</button>
               <button id="globe-zoom-out" aria-label="Zoom out">&minus;</button>
             </div>
+            <button id="globe-info-btn" aria-label="About this globe" aria-expanded="false">!</button>
+            <div id="globe-info-panel" class="hidden" role="dialog" aria-label="About this globe">
+              <h3>🌍 About this globe</h3>
+              <p>Spin the Earth and tune in anywhere — every green dot is a city with live radio stations.</p>
+              <ul>
+                <li><span>🖱️</span> Drag to spin, scroll to zoom</li>
+                <li><span>🔍</span> Zooming in dives toward your cursor</li>
+                <li><span>📻</span> Click a dot to hear its stations</li>
+              </ul>
+              <p class="globe-info-credits">Imagery: Tiles &copy; Esri and imagery contributors<br>Stations &amp; places: Radio Garden</p>
+            </div>
           </div>
           <div id="globe-stations" class="stations-grid hidden"></div>
         </section>
@@ -172,6 +183,6 @@
   </div>
 
   <audio id="audio-player" preload="none"></audio>
-  <script src="app.js?v=green-dot-markers-3"></script>
+  <script src="app.js?v=globe-info-button-1"></script>
 </body>
 </html>

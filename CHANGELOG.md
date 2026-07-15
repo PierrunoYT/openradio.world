@@ -8,8 +8,13 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Globe info button** — a round "!" button in the globe's bottom-left
+  corner opens a glass info panel with usage hints (drag to spin, zoom
+  dives toward the cursor, click a dot to tune in) and the imagery and
+  station data credits. Closes on outside click or Escape.
 - **Removed the imagery credit pill** — the Esri attribution control no
-  longer overlays the globe's bottom-left corner.
+  longer overlays the globe's bottom-left corner; its credit moved into
+  the info panel.
 - **Solid globe again** — the green dots briefly rendered without depth
   testing, so far-side cities showed through the planet and drifted like a
   floating layer while zooming. Dots are depth-tested against the globe
