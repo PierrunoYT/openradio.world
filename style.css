@@ -923,8 +923,19 @@ input[type="text"] {
 
 #globe-3d .maplibregl-ctrl-attrib {
   padding: 2px 6px;
-  background: rgba(5, 8, 23, 0.72);
+  background: rgba(5, 8, 23, 0.92);
+  color: #d9deef;
   border-radius: 4px 0 0 0;
+}
+
+#globe-3d .maplibregl-ctrl-attrib a {
+  color: #a7f3c2;
+}
+
+#globe-3d .maplibregl-ctrl-attrib-button {
+  background-color: transparent;
+  filter: invert(1);
+  opacity: 0.85;
 }
 
 #globe-stats {

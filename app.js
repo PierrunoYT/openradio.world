@@ -865,6 +865,18 @@
           geometry: { type: 'Point', coordinates: place.geo },
         })),
       };
+      const markerRadius = [
+        'interpolate', ['linear'], ['zoom'],
+        0, ['+', 5, ['*', 0.55, ['ln', ['+', 1, ['get', 'size']]]]],
+        5, ['+', 7, ['*', 0.75, ['ln', ['+', 1, ['get', 'size']]]]],
+        12, ['+', 10, ['*', 0.9, ['ln', ['+', 1, ['get', 'size']]]]],
+      ];
+      const markerGlowRadius = [
+        'interpolate', ['linear'], ['zoom'],
+        0, ['+', 11, ['*', 0.55, ['ln', ['+', 1, ['get', 'size']]]]],
+        5, ['+', 13, ['*', 0.75, ['ln', ['+', 1, ['get', 'size']]]]],
+        12, ['+', 16, ['*', 0.9, ['ln', ['+', 1, ['get', 'size']]]]],
+      ];
       const map = new maplibregl.Map({
         container,
         center: [8, 35],
@@ -887,10 +899,37 @@
               maxzoom: 19,
               attribution: 'Tiles © Esri and imagery contributors',
             },
+            places: {
+              type: 'geojson',
+              data: markerData,
+            },
           },
           layers: [
             { id: 'ocean', type: 'background', paint: { 'background-color': '#071a2c' } },
             { id: 'satellite', type: 'raster', source: 'satellite' },
+            {
+              id: 'places-glow',
+              type: 'circle',
+              source: 'places',
+              paint: {
+                'circle-color': '#43f58d',
+                'circle-radius': markerGlowRadius,
+                'circle-opacity': 0.42,
+                'circle-blur': 0.75,
+              },
+            },
+            {
+              id: 'places',
+              type: 'circle',
+              source: 'places',
+              paint: {
+                'circle-color': '#55f59a',
+                'circle-stroke-color': '#effff5',
+                'circle-stroke-width': 1.5,
+                'circle-radius': markerRadius,
+                'circle-opacity': 1,
+              },
+            },
           ],
           sky: {
             'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0],
@@ -901,24 +940,6 @@
       map.touchZoomRotate.disableRotation();
 
       await map.once('load');
-      map.addSource('places', { type: 'geojson', data: markerData });
-      map.addLayer({
-        id: 'places',
-        type: 'circle',
-        source: 'places',
-        paint: {
-          'circle-color': '#4af689',
-          'circle-stroke-color': '#143d2b',
-          'circle-stroke-width': 1,
-          'circle-radius': [
-            'interpolate', ['linear'], ['zoom'],
-            0, ['+', 1.5, ['*', 0.45, ['ln', ['+', 1, ['get', 'size']]]]],
-            5, ['+', 2.5, ['*', 0.65, ['ln', ['+', 1, ['get', 'size']]]]],
-            12, ['+', 4, ['*', 0.8, ['ln', ['+', 1, ['get', 'size']]]]],
-          ],
-          'circle-opacity': 0.95,
-        },
-      });
 
       const totalStations = markers.reduce((total, place) => total + (Number(place.size) || 0), 0);
       $('#globe-stats').textContent = `${markers.length.toLocaleString()} places · ${totalStations.toLocaleString()} stations`;
@@ -944,27 +965,36 @@
       container.addEventListener('pointerdown', stopAutoRotate);
       container.addEventListener('wheel', stopAutoRotate, { passive: true });
 
-      function placeFromEvent(event) {
-        const feature = event.features && event.features[0];
+      function placeFromFeature(feature) {
         return feature ? byId.get(feature.properties.id) : null;
       }
-      map.on('mouseenter', 'places', () => {
-        map.getCanvas().style.cursor = 'pointer';
-      });
-      map.on('mouseleave', 'places', () => {
-        map.getCanvas().style.cursor = '';
-        tooltip.classList.add('hidden');
-      });
-      map.on('mousemove', 'places', (event) => {
-        const place = placeFromEvent(event);
-        if (!place) return;
+      function featureNear(point) {
+        if (!map.getLayer('places')) return null;
+        const hitRadius = 12;
+        return map.queryRenderedFeatures([
+          [point.x - hitRadius, point.y - hitRadius],
+          [point.x + hitRadius, point.y + hitRadius],
+        ], { layers: ['places'] })[0] || null;
+      }
+      map.on('mousemove', (event) => {
+        const feature = featureNear(event.point);
+        const place = placeFromFeature(feature);
+        map.getCanvas().style.cursor = place ? 'pointer' : '';
+        if (!place) {
+          tooltip.classList.add('hidden');
+          return;
+        }
         tooltip.textContent = `${place.title}, ${place.country} · ${place.size} station${place.size === 1 ? '' : 's'}`;
         tooltip.style.left = `${event.point.x + 14}px`;
         tooltip.style.top = `${event.point.y - 10}px`;
         tooltip.classList.remove('hidden');
       });
-      map.on('click', 'places', (event) => {
-        const place = placeFromEvent(event);
+      map.on('mouseout', () => {
+        map.getCanvas().style.cursor = '';
+        tooltip.classList.add('hidden');
+      });
+      map.on('click', (event) => {
+        const place = placeFromFeature(featureNear(event.point));
         if (!place) return;
         showPlaceStations(place, stationsEl, 'Back to Globe', () => {
           stationsEl.classList.add('hidden');
