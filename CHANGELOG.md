@@ -8,6 +8,13 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Globe centered again after the zoom-in** — opening the globe bigger
+  (previous entry) exposed a pre-existing offset: the camera's tilt
+  (`pitch: 20`) shifts the rendered sphere downward relative to its
+  geographic center point, which barely showed at the old small zoom but
+  clipped the globe against the bottom of the view once it filled the
+  container. The sphere is now nudged back up by a fraction of its own
+  diameter so it sits centered on any screen size.
 - **Globe opens big, like Radio Garden** — the globe view no longer starts
   as a small distant marble. The starting zoom is now computed from the
   container size so the planet spans about 95% of the shorter edge of the

@@ -1198,6 +1198,12 @@ void main() {
         },
       });
       map.touchZoomRotate.disableRotation();
+      // Passing `padding` to the constructor above has no effect (MapLibre only
+      // applies it via camera methods), and pitch shifts the rendered sphere
+      // downward relative to its geographic center point on screen. Push the
+      // visual center back up by a fraction of the globe's own diameter so it
+      // sits centered in the container instead of clipping at the bottom.
+      map.setPadding({ top: 0, bottom: fitDiameter * 0.295, left: 0, right: 0 });
 
       await map.once('load');
       map.addLayer(markerLayer);
