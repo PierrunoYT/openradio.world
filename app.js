@@ -71,8 +71,8 @@
 
     // Warm the globe library and vector country geometry once the initial view
     // has settled so opening the globe does not start those downloads.
-    const warmGlobe = () => prepareGlobeAssets().catch(() => {
-      // loadGlobe() will retry and show a useful error if the assets still fail.
+    const warmGlobe = () => loadMapLibre().catch(() => {
+      // Opening the Globe view retries and displays an error if loading fails.
     });
     if ('requestIdleCallback' in window) {
       window.requestIdleCallback(warmGlobe, { timeout: 2000 });
@@ -300,7 +300,7 @@
         loadDiscover();
         break;
       case 'globe':
-        loadGlobe();
+        loadMapLibreGlobe();
         break;
       case 'favorites':
         renderFavorites();
@@ -793,206 +793,220 @@
     $('#globe-zoom-out').addEventListener('click', () => zoomBy(1 / 0.65));
   }
 
-  // CesiumJS provides a WGS84 globe with imagery tiles that increase in
-  // resolution as the camera approaches the surface.
-  const CESIUM_VERSION = '1.143.0';
-  const CESIUM_BASE = `https://cdn.jsdelivr.net/npm/cesium@${CESIUM_VERSION}/Build/Cesium`;
-  const CESIUM_MIN_HEIGHT = 30000;
-  const CESIUM_MAX_HEIGHT = 80000000;
-  let cesiumPromise = null;
-  let cesiumGlobePromise = null;
+  // MapLibre uses the same public architecture as Radio Garden: globe
+  // projection, raster imagery tiles, and markers rendered in the map scene.
+  const MAPLIBRE_VERSION = '5.24.0';
+  const MAPLIBRE_BASE = `https://cdn.jsdelivr.net/npm/maplibre-gl@${MAPLIBRE_VERSION}/dist`;
+  let mapLibrePromise = null;
+  let mapLibreGlobePromise = null;
 
-  function loadCesium() {
-    if (window.Cesium) return Promise.resolve(window.Cesium);
-    if (cesiumPromise) return cesiumPromise;
-
-    window.CESIUM_BASE_URL = `${CESIUM_BASE}/`;
-    if (!document.querySelector('link[data-cesium]')) {
+  function loadMapLibre() {
+    if (window.maplibregl) return Promise.resolve(window.maplibregl);
+    if (mapLibrePromise) return mapLibrePromise;
+    if (!document.querySelector('link[data-maplibre]')) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = `${CESIUM_BASE}/Widgets/widgets.css`;
-      link.dataset.cesium = '';
+      link.href = `${MAPLIBRE_BASE}/maplibre-gl.css`;
+      link.dataset.maplibre = '';
       document.head.appendChild(link);
     }
-    cesiumPromise = new Promise((resolve, reject) => {
+    mapLibrePromise = new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = `${CESIUM_BASE}/Cesium.js`;
-      script.onload = () => resolve(window.Cesium);
-      script.onerror = () => reject(new Error('Failed to load CesiumJS'));
+      script.src = `${MAPLIBRE_BASE}/maplibre-gl.js`;
+      script.onload = () => resolve(window.maplibregl);
+      script.onerror = () => reject(new Error('Failed to load MapLibre GL JS'));
       document.head.appendChild(script);
     }).catch((err) => {
-      cesiumPromise = null;
+      mapLibrePromise = null;
       throw err;
     });
-    return cesiumPromise;
+    return mapLibrePromise;
   }
 
-  prepareGlobeAssets = loadCesium;
-
-  loadGlobe = async function loadCesiumGlobe() {
-    if (window.__cesiumGlobe) {
+  async function loadMapLibreGlobe() {
+    if (window.__mapLibreGlobe) {
       window.__globe.resumeAnimation();
       return;
     }
-    if (cesiumGlobePromise) return cesiumGlobePromise;
+    if (mapLibreGlobePromise) return mapLibreGlobePromise;
 
-    cesiumGlobePromise = (async () => {
+    mapLibreGlobePromise = (async () => {
+      const wrap = $('#globe-wrap');
+      const container = $('#globe-3d');
+      const tooltip = $('#globe-tooltip');
+      const stationsEl = $('#globe-stations');
+      wrap.classList.add('is-loading');
+      container.innerHTML = '';
 
-    const wrap = $('#globe-wrap');
-    const container = $('#globe-3d');
-    const tooltip = $('#globe-tooltip');
-    const stationsEl = $('#globe-stations');
-    wrap.classList.add('is-loading');
-    container.innerHTML = '';
-
-    let Cesium;
-    let places;
-    try {
-      [Cesium, places] = await Promise.all([loadCesium(), getPlaces()]);
-    } catch (err) {
-      console.error('Failed to load globe:', err);
-      wrap.classList.remove('is-loading');
-      container.innerHTML = '<div class="empty-state"><p>Failed to load the globe. Please refresh.</p></div>';
-      cesiumGlobePromise = null;
-      return;
-    }
-
-    const markers = places.filter((place) => Array.isArray(place.geo) && place.geo.length === 2);
-    const imagery = new Cesium.UrlTemplateImageryProvider({
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      maximumLevel: 19,
-      credit: 'Tiles © Esri and imagery contributors',
-      enablePickFeatures: false,
-    });
-    const viewer = new Cesium.Viewer(container, {
-      animation: false,
-      baseLayer: new Cesium.ImageryLayer(imagery),
-      baseLayerPicker: false,
-      fullscreenButton: false,
-      geocoder: false,
-      homeButton: false,
-      infoBox: false,
-      navigationHelpButton: false,
-      scene3DOnly: true,
-      sceneModePicker: false,
-      selectionIndicator: false,
-      timeline: false,
-      useBrowserRecommendedResolution: false,
-      msaaSamples: 4,
-    });
-    const { camera, scene } = viewer;
-    viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, 1.5);
-    viewer.targetFrameRate = 60;
-    scene.backgroundColor = Cesium.Color.fromCssColorString('#050817');
-    scene.globe.baseColor = Cesium.Color.fromCssColorString('#071a2c');
-    scene.globe.enableLighting = false;
-    scene.fog.enabled = true;
-    scene.screenSpaceCameraController.minimumZoomDistance = CESIUM_MIN_HEIGHT;
-    scene.screenSpaceCameraController.maximumZoomDistance = CESIUM_MAX_HEIGHT;
-    camera.setView({
-      destination: Cesium.Cartesian3.fromDegrees(8, 35, 18000000),
-      orientation: { heading: 0, pitch: -Cesium.Math.PI_OVER_TWO, roll: 0 },
-    });
-
-    const points = scene.primitives.add(new Cesium.PointPrimitiveCollection({
-      blendOption: Cesium.BlendOption.OPAQUE,
-    }));
-    markers.forEach((place) => {
-      const weight = Math.min(5, Math.log2((Number(place.size) || 0) + 1));
-      points.add({
-        position: Cesium.Cartesian3.fromDegrees(place.geo[0], place.geo[1], 1000),
-        pixelSize: 4 + weight * 0.65 + (place.boost ? 1.5 : 0),
-        color: Cesium.Color.fromCssColorString('#4af689'),
-        outlineColor: Cesium.Color.fromCssColorString('#143d2b'),
-        outlineWidth: 1,
-        id: place,
-      });
-    });
-
-    const totalStations = markers.reduce((total, place) => total + (Number(place.size) || 0), 0);
-    $('#globe-stats').textContent = `${markers.length.toLocaleString()} places · ${totalStations.toLocaleString()} stations`;
-
-    let autoRotate = true;
-    let running = true;
-    let lastTime = performance.now();
-    scene.preRender.addEventListener(() => {
-      const now = performance.now();
-      if (running && autoRotate && currentView === 'globe') {
-        camera.rotate(Cesium.Cartesian3.UNIT_Z, -(now - lastTime) * 0.000015);
-      }
-      lastTime = now;
-    });
-    const stopAutoRotate = () => {
-      autoRotate = false;
-    };
-    container.addEventListener('pointerdown', stopAutoRotate);
-    container.addEventListener('wheel', stopAutoRotate, { passive: true });
-
-    function pickedPlace(position) {
-      const picked = scene.pick(position);
-      return picked && picked.id && picked.primitive ? picked.id : null;
-    }
-
-    const handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
-    handler.setInputAction((movement) => {
-      const place = pickedPlace(movement.endPosition);
-      if (!place) {
-        tooltip.classList.add('hidden');
+      let maplibregl;
+      let places;
+      try {
+        [maplibregl, places] = await Promise.all([loadMapLibre(), getPlaces()]);
+      } catch (err) {
+        console.error('Failed to load globe:', err);
+        wrap.classList.remove('is-loading');
+        container.innerHTML = '<div class="empty-state"><p>Failed to load the globe. Please refresh.</p></div>';
+        mapLibreGlobePromise = null;
         return;
       }
-      tooltip.textContent = `${place.title}, ${place.country} · ${place.size} station${place.size === 1 ? '' : 's'}`;
-      tooltip.style.left = `${movement.endPosition.x + 14}px`;
-      tooltip.style.top = `${movement.endPosition.y - 10}px`;
-      tooltip.classList.remove('hidden');
-    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-    handler.setInputAction((movement) => {
-      const place = pickedPlace(movement.position);
-      if (!place) return;
-      showPlaceStations(place, stationsEl, 'Back to Globe', () => {
-        stationsEl.classList.add('hidden');
+
+      const markers = places.filter((place) => Array.isArray(place.geo) && place.geo.length === 2);
+      const byId = new Map(markers.map((place) => [place.id, place]));
+      const markerData = {
+        type: 'FeatureCollection',
+        features: markers.map((place) => ({
+          type: 'Feature',
+          id: place.id,
+          properties: {
+            id: place.id,
+            size: Number(place.size) || 0,
+            boost: place.boost ? 1 : 0,
+          },
+          geometry: { type: 'Point', coordinates: place.geo },
+        })),
+      };
+      const map = new maplibregl.Map({
+        container,
+        center: [8, 35],
+        zoom: 1.15,
+        minZoom: 0,
+        maxZoom: 19,
+        pitch: 0,
+        bearing: 0,
+        attributionControl: false,
+        doubleClickZoom: false,
+        pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
+        style: {
+          version: 8,
+          projection: { type: 'globe' },
+          sources: {
+            satellite: {
+              type: 'raster',
+              tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+              tileSize: 256,
+              maxzoom: 19,
+              attribution: 'Tiles © Esri and imagery contributors',
+            },
+          },
+          layers: [
+            { id: 'ocean', type: 'background', paint: { 'background-color': '#071a2c' } },
+            { id: 'satellite', type: 'raster', source: 'satellite' },
+          ],
+          sky: {
+            'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0],
+          },
+        },
       });
-      stationsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-    handler.setInputAction(() => tooltip.classList.add('hidden'), Cesium.ScreenSpaceEventType.LEFT_DOWN);
+      map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
+      map.touchZoomRotate.disableRotation();
 
-    let revealTimer = setTimeout(() => wrap.classList.remove('is-loading'), 8000);
-    const reveal = () => {
-      if (!scene.globe.tilesLoaded) return;
-      scene.postRender.removeEventListener(reveal);
-      clearTimeout(revealTimer);
-      revealTimer = null;
+      await map.once('load');
+      map.addSource('places', { type: 'geojson', data: markerData });
+      map.addLayer({
+        id: 'places',
+        type: 'circle',
+        source: 'places',
+        paint: {
+          'circle-color': '#4af689',
+          'circle-stroke-color': '#143d2b',
+          'circle-stroke-width': 1,
+          'circle-radius': [
+            'interpolate', ['linear'], ['zoom'],
+            0, ['+', 1.5, ['*', 0.45, ['ln', ['+', 1, ['get', 'size']]]]],
+            5, ['+', 2.5, ['*', 0.65, ['ln', ['+', 1, ['get', 'size']]]]],
+            12, ['+', 4, ['*', 0.8, ['ln', ['+', 1, ['get', 'size']]]]],
+          ],
+          'circle-opacity': 0.95,
+        },
+      });
+
+      const totalStations = markers.reduce((total, place) => total + (Number(place.size) || 0), 0);
+      $('#globe-stats').textContent = `${markers.length.toLocaleString()} places · ${totalStations.toLocaleString()} stations`;
+
+      let autoRotate = true;
+      let running = true;
+      let rotateFrame = 0;
+      let lastTime = performance.now();
+      const rotate = (time) => {
+        rotateFrame = 0;
+        if (!running || !autoRotate || currentView !== 'globe') return;
+        const elapsed = Math.min(40, time - lastTime);
+        lastTime = time;
+        const center = map.getCenter();
+        map.setCenter([center.lng + elapsed * 0.0012, center.lat]);
+        rotateFrame = requestAnimationFrame(rotate);
+      };
+      const stopAutoRotate = () => {
+        autoRotate = false;
+        if (rotateFrame) cancelAnimationFrame(rotateFrame);
+        rotateFrame = 0;
+      };
+      container.addEventListener('pointerdown', stopAutoRotate);
+      container.addEventListener('wheel', stopAutoRotate, { passive: true });
+
+      function placeFromEvent(event) {
+        const feature = event.features && event.features[0];
+        return feature ? byId.get(feature.properties.id) : null;
+      }
+      map.on('mouseenter', 'places', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', 'places', () => {
+        map.getCanvas().style.cursor = '';
+        tooltip.classList.add('hidden');
+      });
+      map.on('mousemove', 'places', (event) => {
+        const place = placeFromEvent(event);
+        if (!place) return;
+        tooltip.textContent = `${place.title}, ${place.country} · ${place.size} station${place.size === 1 ? '' : 's'}`;
+        tooltip.style.left = `${event.point.x + 14}px`;
+        tooltip.style.top = `${event.point.y - 10}px`;
+        tooltip.classList.remove('hidden');
+      });
+      map.on('click', 'places', (event) => {
+        const place = placeFromEvent(event);
+        if (!place) return;
+        showPlaceStations(place, stationsEl, 'Back to Globe', () => {
+          stationsEl.classList.add('hidden');
+        });
+        stationsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+
+      await Promise.race([
+        map.once('idle'),
+        new Promise((resolve) => setTimeout(resolve, 8000)),
+      ]);
       wrap.classList.remove('is-loading');
-    };
-    scene.postRender.addEventListener(reveal);
 
-    function zoomBy(factor) {
-      autoRotate = false;
-      const height = camera.positionCartographic.height;
-      const target = Math.max(CESIUM_MIN_HEIGHT, Math.min(CESIUM_MAX_HEIGHT, height * factor));
-      camera.moveForward(height - target);
-    }
-    $('#globe-zoom-in').addEventListener('click', () => zoomBy(0.6));
-    $('#globe-zoom-out').addEventListener('click', () => zoomBy(1.65));
+      function zoomBy(delta) {
+        stopAutoRotate();
+        map.easeTo({ zoom: Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), map.getZoom() + delta)), duration: 250 });
+      }
+      $('#globe-zoom-in').addEventListener('click', () => zoomBy(1));
+      $('#globe-zoom-out').addEventListener('click', () => zoomBy(-1));
 
-    window.__globe = {
-      pauseAnimation() {
-        running = false;
-        viewer.useDefaultRenderLoop = false;
-      },
-      resumeAnimation() {
-        running = true;
-        lastTime = performance.now();
-        viewer.useDefaultRenderLoop = true;
-        viewer.resize();
-        scene.requestRender();
-      },
-    };
-    window.__cesiumGlobe = viewer;
-    refreshGlobeMarkers = () => scene.requestRender();
-    if (currentView !== 'globe') window.__globe.pauseAnimation();
+      window.__globe = {
+        pauseAnimation() {
+          running = false;
+          if (rotateFrame) cancelAnimationFrame(rotateFrame);
+          rotateFrame = 0;
+          map.stop();
+        },
+        resumeAnimation() {
+          running = true;
+          lastTime = performance.now();
+          map.resize();
+          map.triggerRepaint();
+          if (autoRotate && !rotateFrame) rotateFrame = requestAnimationFrame(rotate);
+        },
+      };
+      window.__mapLibreGlobe = map;
+      refreshGlobeMarkers = () => map.triggerRepaint();
+      if (currentView === 'globe') rotateFrame = requestAnimationFrame(rotate);
+      else window.__globe.pauseAnimation();
     })();
-    return cesiumGlobePromise;
-  };
+    return mapLibreGlobePromise;
+  }
 
   // ===== Search =====
   function handleSearch(query) {

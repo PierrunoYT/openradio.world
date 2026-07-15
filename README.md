@@ -5,7 +5,7 @@
 No accounts, no ads, no tracking. Just open and listen.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Dependencies](https://img.shields.io/badge/dependencies-CesiumJS-brightgreen.svg)
+![Dependencies](https://img.shields.io/badge/dependencies-MapLibre-brightgreen.svg)
 ![Build](https://img.shields.io/badge/build-none_needed-brightgreen.svg)
 
 **GitHub:** [https://github.com/PierrunoYT/openradio.world](https://github.com/PierrunoYT/openradio.world)
@@ -16,9 +16,8 @@ No accounts, no ads, no tracking. Just open and listen.
 
 ### 2026-07-15
 
-- **Globe** — Uses CesiumJS with tiled Esri satellite imagery, native WGS84
-  positioning, GPU station points, synchronized loading, and camera heights
-  from 30 km to 80,000 km.
+- **Globe** — Uses MapLibre GL JS globe projection with tiled Esri satellite
+  imagery, native GPU station markers, and synchronized loading.
 - **Streams on HTTPS** — Added a restricted `/listen` proxy so stations using
   plain-HTTP streams can play securely on the deployed HTTPS site.
 - **Offline resilience** — Added a resumable full-directory snapshot and
@@ -38,7 +37,7 @@ For complete details, see the [changelog](CHANGELOG.md).
 
 - **Thousands of stations in 12,000+ cities** worldwide via the [Radio Garden](https://radio.garden/) API
 - **Discover** — Stations from a rotating selection of featured cities around the globe
-- **Globe** — A high-resolution CesiumJS Earth with tiled satellite imagery and GPU station markers; spin, zoom, and click a city to tune in
+- **Globe** — A Radio Garden-style MapLibre globe with tiled satellite imagery and GPU station markers; spin, zoom, and click a city to tune in
 - **Search** — Real-time search by station name or place
 - **Browse by Country** — Drill down from country to city to stations
 - **Browse by City** — Every city on the Radio Garden globe, sorted by station count
@@ -48,7 +47,7 @@ For complete details, see the [changelog](CHANGELOG.md).
 - **Keyboard Shortcuts** — Navigate and control playback without touching the mouse
 - **Responsive Design** — Works on desktop, tablet, and mobile
 - **Dark Theme** — Modern dark UI with purple accents and animated equalizer
-- **No Build Step** — Plain HTML, CSS, and JavaScript; CesiumJS loads from a pinned CDN release
+- **No Build Step** — Plain HTML, CSS, and JavaScript; MapLibre loads from a pinned CDN release
 - **Stream Retry Logic** — Automatic retries when a stream fails to start
 
 ## Getting Started
@@ -118,7 +117,7 @@ OpenRadio/
 - **CSS Custom Properties** for theming
 - **Media Session API** for OS-level media controls
 - **localStorage** for favorites and preferences
-- **CesiumJS** — high-precision WGS84 globe rendering and GPU marker picking
+- **MapLibre GL JS** — globe projection, GPU marker rendering, and native feature picking
 - **Esri World Imagery** — tiled satellite imagery that increases in detail while zooming
 - **Vanilla JavaScript** — no frameworks, no transpilers, no bundlers
 

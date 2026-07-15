@@ -10,22 +10,22 @@ rather than by version number. Newest first.
 
 ### Changed
 
-- **CesiumJS renderer** — the globe now uses the established CesiumJS WGS84
-  engine instead of a custom renderer or globe.gl implementation.
+- **MapLibre globe renderer** — the globe now uses MapLibre GL JS with
+  `projection: "globe"`, matching Radio Garden's current public architecture.
 - **High-resolution satellite Earth** — Esri World Imagery is loaded as a
   level-of-detail tile pyramid up to level 19, so finer imagery streams in as
   the camera approaches instead of stretching one global image.
-- **Radio Garden-style place markers** — all 12,326 places are rendered in one
-  Cesium GPU point collection with station-weighted sizes.
-- **Accurate interaction** — markers and the WGS84 Earth share one Cesium
-  scene, so native GPU picking keeps hover and clicks aligned at every zoom.
+- **Radio Garden-style place markers** — all 12,326 places are rendered in a
+  native MapLibre GeoJSON circle layer with station-weighted sizes.
+- **Accurate interaction** — markers and Earth share MapLibre's projection,
+  so native rendered-feature picking stays aligned at every zoom.
 - **Synchronized loading** — the loader remains visible until initial imagery
   tiles and station points have rendered together.
-- **Expanded zoom range** — wheel, pinch, and button zoom support camera
-  heights from 30 km to 80,000 km.
+- **Expanded zoom range** — wheel, pinch, and button zoom use MapLibre levels
+  0 through 19, matching the available satellite imagery detail.
 - **Lower background cost** — animation stops whenever another app view is
   open, and render resolution is capped on high-DPI screens.
-- **Faster first open** — CesiumJS warms during browser idle time, while the
+- **Faster first open** — MapLibre warms during browser idle time, while the
   globe still loads only the places snapshot rather than the station catalog.
 
 ### Added
