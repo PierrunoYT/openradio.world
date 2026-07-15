@@ -325,9 +325,15 @@
     const stationsEl = $('#globe-stations');
 
     let pts;
+    let countries;
     try {
-      const [places] = await Promise.all([getPlaces(), loadScript('lib/globe.gl.min.js')]);
+      const [places, , geoRes] = await Promise.all([
+        getPlaces(),
+        loadScript('lib/globe.gl.min.js'),
+        fetch('data/countries.geojson'),
+      ]);
       pts = places.filter((p) => Array.isArray(p.geo) && p.geo.length === 2);
+      countries = geoRes.ok ? await geoRes.json() : { features: [] };
     } catch (err) {
       console.error('Failed to load globe:', err);
       globeInited = false;
@@ -335,14 +341,20 @@
       return;
     }
 
+    // Vector globe: country polygons on a colored sphere — crisp at any zoom
     const globe = Globe()(container)
       .width(wrap.clientWidth)
       .height(wrap.clientHeight)
       .backgroundColor('rgba(0,0,0,0)')
-      .globeImageUrl('assets/earth.jpg')
       .showAtmosphere(true)
       .atmosphereColor('#a29bfe')
       .atmosphereAltitude(0.15)
+      .polygonsData(countries.features)
+      .polygonCapColor(() => '#26264f')
+      .polygonSideColor(() => 'rgba(0, 0, 0, 0)')
+      .polygonStrokeColor(() => 'rgba(162, 155, 254, 0.4)')
+      .polygonAltitude(0.002)
+      .polygonsTransitionDuration(0)
       .pointsMerge(true)
       .pointsData(pts)
       .pointLat((p) => p.geo[1])
@@ -360,15 +372,36 @@
         }
       });
 
+    globe.globeMaterial().color.set('#0b0f2b'); // ocean
+
     globe.pointOfView({ lat: 45, lng: 10, altitude: 2 }, 0);
 
     const controls = globe.controls();
     controls.autoRotate = true;
     controls.autoRotateSpeed = 0.4;
-    controls.minDistance = 115; // globe radius is 100 units
+    controls.minDistance = 101.8; // globe radius is 100 units — allow close zoom
     controls.maxDistance = 480;
     controls.addEventListener('start', () => {
       controls.autoRotate = false;
+    });
+
+    // Shrink the city points as the camera gets closer, so a zoomed-in
+    // view shows fine dots instead of fat cylinders. Rebuilding the merged
+    // geometry is not free, so do it debounced and only on real change.
+    let pointScale = 1;
+    let zoomTimer = null;
+    function updatePointScale() {
+      const alt = globe.pointOfView().altitude;
+      const s = Math.max(0.04, Math.min(1, alt / 2));
+      if (Math.abs(s - pointScale) / pointScale < 0.25) return;
+      pointScale = s;
+      globe
+        .pointRadius((p) => (p.boost ? 0.2 : p.size > 40 ? 0.14 : 0.09) * s)
+        .pointAltitude(0.004 * s);
+    }
+    controls.addEventListener('change', () => {
+      clearTimeout(zoomTimer);
+      zoomTimer = setTimeout(updatePointScale, 150);
     });
 
     // Nearest place to a lat/lng, accepted within a zoom-scaled radius
