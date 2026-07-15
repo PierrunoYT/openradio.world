@@ -1,17 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#26264a"/>
-      <stop offset=".55" stop-color="#141430"/>
-      <stop offset="1" stop-color="#0a0a18"/>
+      <stop offset="0" stop-color="#1a2136"/>
+      <stop offset=".55" stop-color="#0e1220"/>
+      <stop offset="1" stop-color="#07090e"/>
     </linearGradient>
     <linearGradient id="mark" gradientUnits="userSpaceOnUse" x1="4" y1="4" x2="20" y2="20">
-      <stop offset="0" stop-color="#a29bfe"/>
-      <stop offset="1" stop-color="#6c5ce7"/>
+      <stop offset="0" stop-color="#ffc46b"/>
+      <stop offset="1" stop-color="#f6a83c"/>
     </linearGradient>
     <radialGradient id="glow" cx=".5" cy=".38" r=".65">
-      <stop offset="0" stop-color="#6c5ce7" stop-opacity=".5"/>
-      <stop offset="1" stop-color="#6c5ce7" stop-opacity="0"/>
+      <stop offset="0" stop-color="#f6a83c" stop-opacity=".42"/>
+      <stop offset="1" stop-color="#f6a83c" stop-opacity="0"/>
     </radialGradient>
   </defs>
   <rect width="512" height="512" rx="116" fill="url(#bg)"/>
