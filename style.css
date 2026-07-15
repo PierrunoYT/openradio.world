@@ -767,6 +767,15 @@ input[type="text"] {
   max-width: 320px;
 }
 
+.player-wave {
+  width: clamp(64px, 9vw, 120px);
+  height: 36px;
+  min-width: 64px;
+  flex: 0 1 120px;
+  opacity: 0.92;
+  filter: drop-shadow(0 0 7px rgba(74, 246, 137, 0.16));
+}
+
 .player-favicon {
   width: 50px;
   height: 50px;
@@ -1090,6 +1099,10 @@ input[type="text"] {
     max-width: none;
   }
 
+  .player-wave {
+    flex-basis: 76px;
+  }
+
   .player-extras {
     max-width: none;
     flex: 0 0 auto;
@@ -1135,6 +1148,13 @@ input[type="text"] {
   .play-btn {
     width: 44px;
     height: 44px;
+  }
+
+  .player-wave {
+    width: 54px;
+    min-width: 54px;
+    height: 30px;
+    flex-basis: 54px;
   }
 
   #btn-prev, #btn-next {

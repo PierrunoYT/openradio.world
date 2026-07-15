@@ -45,6 +45,7 @@
   const playerName = $('#player-name');
   const playerMeta = $('#player-meta');
   const playerFavicon = $('#player-favicon');
+  const playerWave = $('#player-wave');
   const btnPlay = $('#btn-play');
   const btnPrev = $('#btn-prev');
   const btnNext = $('#btn-next');
@@ -214,23 +215,22 @@
     };
   }
 
-  // On an https page, plain-http audio is blocked as mixed content;
-  // route those streams through our own proxy (functions/listen.js)
-  function proxiedIfNeeded(url) {
-    if (url.startsWith('http://') && location.protocol === 'https:') {
+  // Production audio stays same-origin through the restricted streaming proxy.
+  // Besides handling mixed content, this lets Web Audio analyse the stream
+  // without requiring every third-party station host to provide CORS headers.
+  function proxiedStreamUrl(url) {
+    if (LIVE_API_ENABLED) {
       return `/listen?url=${encodeURIComponent(url)}`;
     }
     return url;
   }
 
   function streamUrl(station) {
-    // Snapshot data and legacy favorites carry their own stream URL
+    // Snapshot data and legacy favorites carry their own stream URL.
     if (station.streamUrl) {
-      return proxiedIfNeeded(station.streamUrl);
+      return proxiedStreamUrl(station.streamUrl);
     }
-    // Live API station whose stream is insecure: the listen redirect would
-    // land on http:// and be blocked on an https page — use the proxy
-    if (station.secure === false && location.protocol === 'https:') {
+    if (LIVE_API_ENABLED) {
       return `/listen?id=${encodeURIComponent(station.id)}`;
     }
     return `${RADIO_GARDEN_API}/ara/content/listen/${station.id}/channel.mp3`;
@@ -2001,6 +2001,120 @@ void main() {
   let retryCount = 0;
   let triedSnapshotStream = false;
   const MAX_RETRIES = 2;
+  let waveAudioContext = null;
+  let waveAnalyser = null;
+  let waveFrequencyData = null;
+  let waveAnimationFrame = 0;
+  const waveLevels = new Float32Array(3);
+  const waveContext = playerWave ? playerWave.getContext('2d') : null;
+  const reducedWaveMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function ensurePlayerWaveAnalyser() {
+    if (!LIVE_API_ENABLED || !waveContext) return;
+    if (waveAudioContext) {
+      if (waveAudioContext.state === 'suspended') {
+        waveAudioContext.resume().catch(() => {});
+      }
+      return;
+    }
+
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    try {
+      const context = new AudioContextClass();
+      const source = context.createMediaElementSource(audio);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.72;
+      source.connect(analyser);
+      analyser.connect(context.destination);
+      waveAudioContext = context;
+      waveAnalyser = analyser;
+      waveFrequencyData = new Uint8Array(analyser.frequencyBinCount);
+      context.resume().catch(() => {});
+    } catch (err) {
+      console.warn('Audio visualizer unavailable:', err.message);
+    }
+  }
+
+  function measureWaveLevel(start, end) {
+    let total = 0;
+    for (let i = start; i < end; i++) total += waveFrequencyData[i];
+    return Math.max(0, Math.min(1, (total / (end - start) - 12) / 210));
+  }
+
+  function drawPlayerWave(timestamp = 0) {
+    if (!waveContext || !playerWave) return;
+
+    const width = playerWave.clientWidth || 120;
+    const height = playerWave.clientHeight || 36;
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    const pixelWidth = Math.max(1, Math.round(width * pixelRatio));
+    const pixelHeight = Math.max(1, Math.round(height * pixelRatio));
+    if (playerWave.width !== pixelWidth || playerWave.height !== pixelHeight) {
+      playerWave.width = pixelWidth;
+      playerWave.height = pixelHeight;
+    }
+    waveContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    waveContext.clearRect(0, 0, width, height);
+
+    waveLevels.fill(0);
+    if (waveAnalyser && isPlaying) {
+      waveAnalyser.getByteFrequencyData(waveFrequencyData);
+      waveLevels[0] = measureWaveLevel(1, 12);
+      waveLevels[1] = measureWaveLevel(12, 42);
+      waveLevels[2] = measureWaveLevel(42, 96);
+    }
+
+    const centers = [height * 0.25, height * 0.5, height * 0.75];
+    const cycles = [1.4, 2.1, 2.8];
+    const speeds = [1.7, -1.25, 0.9];
+    const colors = ['rgba(255, 196, 107, 0.92)', 'rgba(74, 246, 137, 0.82)', 'rgba(154, 165, 188, 0.68)'];
+    const elapsed = timestamp * 0.001;
+
+    waveContext.lineWidth = 1.4;
+    waveContext.lineCap = 'round';
+    waveContext.lineJoin = 'round';
+    for (let line = 0; line < 3; line++) {
+      const amplitude = 0.8 + waveLevels[line] * height * 0.14;
+      const phase = elapsed * speeds[line];
+      waveContext.beginPath();
+      waveContext.strokeStyle = colors[line];
+      for (let x = 0; x <= width; x += 2) {
+        const progress = x / width;
+        const envelope = Math.sin(Math.PI * progress);
+        const y = centers[line]
+          + Math.sin(progress * Math.PI * 2 * cycles[line] + phase) * amplitude * envelope;
+        if (x === 0) waveContext.moveTo(x, y);
+        else waveContext.lineTo(x, y);
+      }
+      waveContext.stroke();
+    }
+  }
+
+  function animatePlayerWave(timestamp) {
+    waveAnimationFrame = 0;
+    drawPlayerWave(timestamp);
+    if (isPlaying && !reducedWaveMotion) {
+      waveAnimationFrame = requestAnimationFrame(animatePlayerWave);
+    }
+  }
+
+  function startPlayerWave() {
+    if (waveAudioContext && waveAudioContext.state === 'suspended') {
+      waveAudioContext.resume().catch(() => {});
+    }
+    if (!waveAnimationFrame) {
+      waveAnimationFrame = requestAnimationFrame(animatePlayerWave);
+    }
+  }
+
+  function stopPlayerWave() {
+    if (waveAnimationFrame) cancelAnimationFrame(waveAnimationFrame);
+    waveAnimationFrame = 0;
+    drawPlayerWave();
+  }
 
   function playStation(station) {
     currentStation = station;
@@ -2012,7 +2126,8 @@ void main() {
 
     playerBar.classList.remove('hidden');
 
-    // The listen endpoint 302-redirects to the real stream; the browser follows it
+    ensurePlayerWaveAnalyser();
+    // Production streams stay same-origin through /listen for Web Audio.
     attemptPlay(streamUrl(station));
 
     try {
@@ -2109,17 +2224,20 @@ void main() {
     isPlaying = true;
     isLoading = false;
     updatePlayerUI();
+    startPlayerWave();
   });
 
   audio.addEventListener('pause', () => {
     isPlaying = false;
     isLoading = false;
     updatePlayerUI();
+    stopPlayerWave();
   });
 
   audio.addEventListener('waiting', () => {
     isLoading = true;
     updatePlayerUI();
+    stopPlayerWave();
   });
 
   audio.addEventListener('error', async () => {
@@ -2141,7 +2259,7 @@ void main() {
         const saved = snap.stations.find((s) => s.id === currentStation.id);
         if (saved && saved.streamUrl) {
           console.log('Falling back to snapshot stream URL...');
-          attemptPlay(proxiedIfNeeded(saved.streamUrl));
+          attemptPlay(proxiedStreamUrl(saved.streamUrl));
           return;
         }
       } catch {}

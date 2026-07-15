@@ -8,6 +8,12 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **The player now has a sound-reactive three-line waveform** — low, mid, and
+  high frequency energy from the live stream drives three colored waves in the
+  playback bar. Production audio now uses the existing restricted same-origin
+  stream proxy so the Web Audio analyser works without depending on station
+  hosts to expose CORS headers; reduced-motion users receive a static wave.
+
 - **Opening an active station on the globe no longer interrupts playback** —
   the globe button now preserves an already-playing or loading stream while it
   navigates to the marked location and side panel. Choosing a different or

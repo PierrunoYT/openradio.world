@@ -28,7 +28,7 @@ OpenRadio ships continuously — every push to `main` deploys. See the
 - **Browse by Country** — Drill down from country to city to stations
 - **Browse by City** — Every city on the Radio Garden globe, sorted by station count
 - **Favorites** — Save your favorite stations locally (persisted in localStorage)
-- **Full Audio Player** — Play/pause, previous/next, volume control, mute toggle
+- **Full Audio Player** — Play/pause, previous/next, volume, mute, and a three-line waveform that reacts to the live station audio
 - **Media Session Integration** — Controls appear in your OS notification area and lock screen
 - **Keyboard Shortcuts** — Navigate and control playback without touching the mouse
 - **Responsive Design** — Works on desktop, tablet, and mobile, including safe-area support for notched phones
