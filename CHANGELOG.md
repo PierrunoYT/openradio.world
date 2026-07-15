@@ -8,6 +8,12 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Visible head-on markers** — spikes point radially at the camera near the
+  center of the visible hemisphere and collapsed to a subpixel cap, leaving
+  the globe's face looking empty. Each spike tip now carries a screen-sized
+  glowing dot (3.5–6.5 px, station-weighted) drawn as a second instanced
+  pass and included in pixel picking, so every place is visible and
+  clickable from any viewing angle.
 - **Custom WebGL spike layer** — the station spikes are no longer MapLibre
   fill-extrusions: a custom layer draws all 12,326 octagonal spikes in a
   single instanced WebGL call inside MapLibre's render loop, using MapLibre's
