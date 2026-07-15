@@ -8,6 +8,13 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **GitHub link in the sidebar** — OpenRadio is open source, and the site
+  now says so: the sidebar footer links to the project repository at
+  [github.com/PierrunoYT/openradio.world](https://github.com/PierrunoYT/openradio.world),
+  with a GitHub mark that highlights on hover. The README also dropped its
+  hand-maintained "Today's Changes" section in favor of linking here, and
+  its feature list and project structure were brought up to date (PWA
+  install, SEO files, brand assets).
 - **Brand icon, link previews, and SEO** — the site now has a real identity
   everywhere it appears. A new broadcast-waves mark (purple gradient on a
   dark tile, `assets/icon.svg`) replaces the 📻 emoji as the favicon, the

@@ -12,25 +12,10 @@ No accounts, no ads, no tracking. Just open and listen.
 
 ---
 
-## Today's Changes
+## What's New
 
-### 2026-07-15
-
-- **Globe** — Uses MapLibre GL JS globe projection with tiled Esri satellite
-  imagery, Radio Garden-style glowing green station dots rendered by a custom
-  WebGL layer, and synchronized loading.
-- **Streams on HTTPS** — Added a restricted `/listen` proxy so stations using
-  plain-HTTP streams can play securely on the deployed HTTPS site.
-- **Offline resilience** — Added a resumable full-directory snapshot and
-  automatic fallbacks for browsing, search, and station playback when the
-  live Radio Garden API is unavailable.
-- **Site launch** — Deployed OpenRadio to Cloudflare Pages, connected
-  **openradio.world**, and established the project repository.
-- **New backend: Radio Garden** — Rebuilt discovery, search, country and city
-  browsing, playback, and favorite migration around the unofficial Radio
-  Garden API.
-
-For complete details, see the [changelog](CHANGELOG.md).
+OpenRadio ships continuously — every push to `main` deploys. See the
+[changelog](CHANGELOG.md) for a full, dated log of what changed and when.
 
 ---
 
@@ -46,8 +31,9 @@ For complete details, see the [changelog](CHANGELOG.md).
 - **Full Audio Player** — Play/pause, previous/next, volume control, mute toggle
 - **Media Session Integration** — Controls appear in your OS notification area and lock screen
 - **Keyboard Shortcuts** — Navigate and control playback without touching the mouse
-- **Responsive Design** — Works on desktop, tablet, and mobile
-- **Dark Theme** — Modern dark UI with purple accents and animated equalizer
+- **Responsive Design** — Works on desktop, tablet, and mobile, including safe-area support for notched phones
+- **Installable PWA** — Web app manifest with full icon set, so it can be added to your home screen or dock
+- **Dark Theme** — Modern dark UI with Inter typography, purple accents, and animated equalizer
 - **No Build Step** — Plain HTML, CSS, and JavaScript; MapLibre loads from a pinned CDN release
 - **Stream Retry Logic** — Automatic retries when a stream fails to start
 
@@ -102,14 +88,17 @@ Then visit `http://localhost:8000`.
 
 ```
 OpenRadio/
-├── assets/       # Screenshots and images
-├── data/         # Local places, stations, and stream-host snapshots
-├── functions/    # Restricted Cloudflare API and audio proxies
-├── index.html    # App structure and layout
-├── style.css     # Dark theme styling and responsive design
-├── app.js        # Application logic, API calls, audio player
-├── README.md     # This file
-└── CHANGELOG.md  # Version history
+├── assets/           # Brand icons, OG link-preview image, screenshots
+├── data/             # Local places, stations, and stream-host snapshots
+├── functions/        # Restricted Cloudflare API and audio proxies
+├── index.html        # App structure, layout, and SEO/social meta
+├── style.css         # Dark theme styling and responsive design
+├── app.js            # Application logic, API calls, audio player
+├── site.webmanifest  # PWA manifest (installable app)
+├── robots.txt        # Crawler rules
+├── sitemap.xml       # Sitemap for search engines
+├── README.md         # This file
+└── CHANGELOG.md      # Version history
 ```
 
 ## Technology
