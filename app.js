@@ -872,14 +872,14 @@
         const longitude = Number(place.geo[0]);
         const latitude = Number(place.geo[1]);
         const stationWeight = Math.log1p(Number(place.size) || 0);
-        const radiusMeters = 6500 + Math.min(4000, stationWeight * 650);
+        const radiusMeters = 1800 + Math.min(1400, stationWeight * 250);
         const angularRadius = radiusMeters / earthRadiusMeters;
         const latitudeRadians = latitude * Math.PI / 180;
         const longitudeRadians = longitude * Math.PI / 180;
         const ring = [];
 
-        for (let side = 0; side <= 6; side += 1) {
-          const bearing = (side % 6) * Math.PI / 3;
+        for (let side = 0; side <= 8; side += 1) {
+          const bearing = (side % 8) * Math.PI / 4;
           const columnLatitude = Math.asin(
             Math.sin(latitudeRadians) * Math.cos(angularRadius)
             + Math.cos(latitudeRadians) * Math.sin(angularRadius) * Math.cos(bearing),
@@ -915,7 +915,7 @@
           id: place.id,
           properties: {
             id: place.id,
-            height: Math.round(28000 + Math.min(32000, Math.log1p(Number(place.size) || 0) * 5500)),
+            height: Math.round(6500 + Math.min(15500, Math.log1p(Number(place.size) || 0) * 2600)),
           },
           geometry: { type: 'Polygon', coordinates: [markerColumnRing(place)] },
         })),
@@ -932,13 +932,29 @@
         5, ['+', 7.5, ['*', 0.5, ['ln', ['+', 1, ['get', 'size']]]]],
         12, ['+', 9, ['*', 0.575, ['ln', ['+', 1, ['get', 'size']]]]],
       ];
+      const markerSurfaceOpacity = [
+        'interpolate', ['linear'], ['zoom'],
+        0, 1,
+        4, 0.85,
+        5.5, 0.08,
+        8.8, 0.08,
+        9, 1,
+      ];
+      const markerGlowOpacity = [
+        'interpolate', ['linear'], ['zoom'],
+        0, 0.42,
+        4, 0.3,
+        5.5, 0,
+        8.8, 0,
+        9, 0.42,
+      ];
       const map = new maplibregl.Map({
         container,
         center: [8, 35],
         zoom: 1.15,
         minZoom: 0,
         maxZoom: 19,
-        pitch: 28,
+        pitch: 20,
         bearing: 0,
         attributionControl: false,
         doubleClickZoom: false,
@@ -972,12 +988,12 @@
               id: 'place-columns',
               type: 'fill-extrusion',
               source: 'place-columns',
-              maxzoom: 7,
+              maxzoom: 9,
               paint: {
-                'fill-extrusion-color': '#32e889',
+                'fill-extrusion-color': '#24ce83',
                 'fill-extrusion-height': ['get', 'height'],
                 'fill-extrusion-base': 0,
-                'fill-extrusion-opacity': 0.92,
+                'fill-extrusion-opacity': 0.88,
                 'fill-extrusion-vertical-gradient': true,
               },
             },
@@ -988,7 +1004,7 @@
               paint: {
                 'circle-color': '#43f58d',
                 'circle-radius': markerGlowRadius,
-                'circle-opacity': 0.42,
+                'circle-opacity': markerGlowOpacity,
                 'circle-blur': 0.75,
               },
             },
@@ -1000,8 +1016,9 @@
                 'circle-color': '#55f59a',
                 'circle-stroke-color': '#effff5',
                 'circle-stroke-width': 1.5,
+                'circle-stroke-opacity': markerSurfaceOpacity,
                 'circle-radius': markerRadius,
-                'circle-opacity': 1,
+                'circle-opacity': markerSurfaceOpacity,
               },
             },
           ],
@@ -1057,7 +1074,7 @@
         const candidates = map.queryRenderedFeatures([
           [point.x - hitRadius, point.y - hitRadius],
           [point.x + hitRadius, point.y + hitRadius],
-        ], { layers: ['places'] });
+        ], { layers: ['places', 'place-columns'] });
         let nearestFeature = null;
         let nearestDistance = Infinity;
         candidates.forEach((feature) => {
