@@ -11,7 +11,11 @@
   'use strict';
 
   // ===== Configuration =====
-  const API_BASE = 'https://radio.garden/api';
+  const API_BASE = '/api';
+  const RADIO_GARDEN_API = 'https://radio.garden/api';
+  // Cloudflare serves /api in production. Plain-HTTP development servers use
+  // the bundled snapshot because they cannot run Pages Functions.
+  const LIVE_API_ENABLED = location.protocol === 'https:';
   const SEARCH_DEBOUNCE = 400;
   const FAV_KEY = 'openradio_favorites';
   const VOL_KEY = 'openradio_volume';
@@ -83,14 +87,15 @@
 
   // ===== API Helpers =====
   async function apiFetch(path) {
+    if (!LIVE_API_ENABLED) throw new Error('Live API disabled for local development');
     const res = await fetch(`${API_BASE}${path}`);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   }
 
-  // ===== Offline Snapshot Fallback =====
+  // ===== Local Snapshot & Fallback =====
   // data/ holds a crawled copy of the directory (see tools/snapshot.mjs).
-  // If the live API is unreachable (e.g. locked down), we serve from it.
+  // Local servers use it directly; production falls back if the API is down.
   let snapshot = null; // { places, stations, byPlace: Map<placeId, station[]> }
   let snapshotPromise = null;
   let snapshotPlaces = null;
@@ -138,7 +143,7 @@
         });
 
         snapshot = { places, stations, byPlace };
-        if (!snapshotNotified) {
+        if (LIVE_API_ENABLED && !snapshotNotified) {
           snapshotNotified = true;
           showToast('Live API unreachable — using local snapshot');
         }
@@ -155,6 +160,10 @@
     if (placesCache) return placesCache;
     if (!placesPromise) {
       placesPromise = (async () => {
+        if (!LIVE_API_ENABLED) {
+          placesCache = await loadSnapshotPlaces();
+          return placesCache;
+        }
         try {
           const data = await apiFetch('/ara/content/places');
           placesCache = data.data.list.filter((p) => p.title && p.country);
@@ -207,10 +216,11 @@
     if (station.secure === false && location.protocol === 'https:') {
       return `/listen?id=${encodeURIComponent(station.id)}`;
     }
-    return `${API_BASE}/ara/content/listen/${station.id}/channel.mp3`;
+    return `${RADIO_GARDEN_API}/ara/content/listen/${station.id}/channel.mp3`;
   }
 
   async function getPlaceStations(placeId) {
+    if (!LIVE_API_ENABLED) return (await loadSnapshot()).byPlace.get(placeId) || [];
     try {
       const data = await apiFetch(`/ara/content/page/${placeId}/channels`);
       const stations = [];
@@ -229,6 +239,12 @@
   }
 
   async function searchStations(query) {
+    if (!LIVE_API_ENABLED) {
+      const q = query.toLowerCase();
+      return (await loadSnapshot()).stations
+        .filter((s) => s.name.toLowerCase().includes(q) || (s.place && s.place.toLowerCase().includes(q)))
+        .slice(0, 50);
+    }
     try {
       const results = await apiFetch(`/search?q=${encodeURIComponent(query)}`);
       const hits = (results.hits && results.hits.hits) || [];

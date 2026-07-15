@@ -102,6 +102,8 @@ Then visit `http://localhost:8000`.
 ```
 OpenRadio/
 ├── assets/       # Screenshots and images
+├── data/         # Local places, stations, and stream-host snapshots
+├── functions/    # Restricted Cloudflare API and audio proxies
 ├── index.html    # App structure and layout
 ├── style.css     # Dark theme styling and responsive design
 ├── app.js        # Application logic, API calls, audio player
@@ -113,6 +115,7 @@ OpenRadio/
 
 - **HTML5 Audio** for stream playback
 - **Radio Garden API** — the (unofficial) API behind the radio.garden globe
+- **Cloudflare Pages Functions** — same-origin JSON and mixed-content audio proxies
 - **CSS Grid & Flexbox** for layout
 - **CSS Custom Properties** for theming
 - **Media Session API** for OS-level media controls
@@ -125,16 +128,23 @@ OpenRadio/
 
 OpenRadio uses the internal API behind [Radio Garden](https://radio.garden/), the interactive globe of live radio:
 
+On the deployed HTTPS site, JSON requests pass through a restricted same-origin
+Cloudflare Pages Function at `/api`. Plain-HTTP local development uses the
+bundled directory snapshots directly, because Radio Garden does not provide
+browser CORS access and `python -m http.server` cannot run Pages Functions.
+
 | Endpoint | Purpose |
 |---|---|
 | `/api/ara/content/places` | All places (cities) with country, coordinates, and station count |
 | `/api/ara/content/page/{placeId}/channels` | Stations in a place |
 | `/api/search?q=...` | Search stations and places |
-| `/api/ara/content/listen/{channelId}/channel.mp3` | Redirects to the station's live stream |
+| `https://radio.garden/api/ara/content/listen/{channelId}/channel.mp3` | Redirects to the station's live stream |
 
-> **Note:** This API is unofficial and undocumented — Radio Garden may change or restrict it at any time.
+> **Note:** This API is unofficial and undocumented — Radio Garden may change or restrict it at any time. The same-origin proxy only permits the three JSON endpoints listed above; the audio redirect remains a direct Radio Garden request.
 
-Playback never touches stream URLs directly: the app points the audio element at the `listen` endpoint and the browser follows the redirect, so streams always resolve to the station's current URL.
+Live API playback uses Radio Garden's `listen` endpoint so streams resolve to
+their current URL. Snapshot playback uses its archived direct URL, with
+plain-HTTP streams routed through the restricted `/listen` proxy on HTTPS.
 
 ## Browser Support
 

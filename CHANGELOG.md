@@ -6,6 +6,20 @@ rather than by version number. Newest first.
 
 ---
 
+## 2026-07-15 — CORS-safe API access
+
+### Fixed
+
+- **Same-origin API proxy** — deployed JSON requests for places, channels, and
+  search now pass through a restricted Cloudflare Pages Function instead of
+  calling Radio Garden directly from the browser, avoiding blocked CORS
+  responses without exposing an open proxy.
+- **Clean local development** — plain-HTTP development servers use the bundled
+  places and stations snapshots immediately, avoiding repeated failed live API
+  requests and console errors.
+
+---
+
 ## 2026-07-15 — Globe
 
 ### Changed
