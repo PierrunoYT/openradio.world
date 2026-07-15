@@ -130,7 +130,9 @@ browser CORS access and `python -m http.server` cannot run Pages Functions.
 | `/api/search?q=...` | Search stations and places |
 | `https://radio.garden/api/ara/content/listen/{channelId}/channel.mp3` | Redirects to the station's live stream |
 
-> **Note:** This API is unofficial and undocumented — Radio Garden may change or restrict it at any time. The same-origin proxy only permits the three JSON endpoints listed above; the audio redirect remains a direct Radio Garden request.
+> **⚠️ Unofficial API:** The Radio Garden API is **not official** — it is the internal, undocumented API behind radio.garden. It is not affiliated with, endorsed by, or supported by Radio Garden, and it **may be changed, restricted, or removed at any time without notice**. If that happens, parts of OpenRadio may stop working until the app is updated. The same-origin proxy only permits the three JSON endpoints listed above; the audio redirect remains a direct Radio Garden request.
+>
+> If you run into any problems, please report them directly via [GitHub Issues](https://github.com/PierrunoYT/openradio.world/issues).
 
 Live API playback uses Radio Garden's `listen` endpoint so streams resolve to
 their current URL. Snapshot playback uses its archived direct URL, with
@@ -146,6 +148,13 @@ Any modern browser with HTML5 Audio support:
 - Opera 67+
 
 > **Note:** Some radio streams may not work in all browsers due to codec support (e.g., HLS streams). The vast majority of stations use MP3 or AAC which work everywhere.
+
+## Support & Issues
+
+Found a bug, a broken station, or something that stopped working (e.g., after a
+Radio Garden API change)? Please contact us directly by opening a
+[GitHub Issue](https://github.com/PierrunoYT/openradio.world/issues) — that is
+the fastest way to get help and the only official support channel.
 
 ## Contributing
 
