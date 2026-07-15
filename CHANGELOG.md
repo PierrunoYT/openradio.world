@@ -9,10 +9,10 @@ commit order rather than by version number. Newest change first.
 ## 2026-07-15
 
 - **Every station card now links back to the globe** — visible globe controls
-  on search, country, city, Discover, and eligible favorite cards open the
-  station's city at a close map zoom with its marker ring selected. The
-  globe-side station panel opens alongside the marked location on desktop and
-  in the existing stacked flow on mobile.
+  on search, country, city, Discover, and eligible favorite cards tune the
+  selected station before opening its city at a close map zoom with the marker
+  ring selected. The globe-side station panel opens alongside the marked
+  location on desktop and in the existing stacked flow on mobile.
 
 - **Discover can be refreshed in place** — a new Refresh button rerolls the
   featured cities and stations without requiring another sidebar click or a

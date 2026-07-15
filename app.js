@@ -1959,6 +1959,15 @@ void main() {
         </div>`;
 
       card.addEventListener('click', (e) => {
+        if (e.target.closest('.btn-fav')) {
+          toggleFavorite(station);
+          return;
+        }
+
+        currentList = playableList;
+        currentIndex = playableList.findIndex((s) => s.id === station.id);
+        playStation(station);
+
         const globeButton = e.target.closest('.btn-globe');
         if (globeButton) {
           globeButton.disabled = true;
@@ -1975,15 +1984,6 @@ void main() {
           return;
         }
 
-        if (e.target.closest('.btn-fav')) {
-          toggleFavorite(station);
-          return;
-        }
-
-        currentList = playableList;
-        currentIndex = playableList.findIndex((s) => s.id === station.id);
-
-        playStation(station);
         if (options.onSelect) options.onSelect(station);
       });
 
