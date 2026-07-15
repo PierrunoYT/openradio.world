@@ -29,16 +29,14 @@ rather than by version number. Newest first.
 - **High-resolution satellite Earth** — Esri World Imagery is loaded as a
   level-of-detail tile pyramid up to level 19, so finer imagery streams in as
   the camera approaches instead of stretching one global image.
-- **High-visibility place markers** — all 12,326 places are rendered in native
-  MapLibre GeoJSON circle layers with compact station-weighted sizes, a bright
-  outline, and a soft glow that remains legible over satellite imagery.
-- **Extruded marker columns** — every place now has a slim octagonal MapLibre
-  fill extrusion rising clearly above the globe, with shaded walls and
-  station-weighted height. Balanced footprints keep them prominent without
-  returning to the oversized block look, while ground circles fade cleanly.
-- **Forgiving marker interaction** — rendered-feature picking uses a 12-pixel
-  tolerance around the pointer, making even small and densely packed places
-  easier to hover and select while remaining aligned with the globe.
+- **Spike station markers** — all 12,326 places are rendered as thin octagonal
+  MapLibre fill-extrusion spikes with station-weighted heights of 160–400 km,
+  tall enough to read at the initial world view without zooming in. The spikes
+  are the sole marker at every zoom level; the earlier ground circles and glow
+  layers that blended into the column bases were removed.
+- **Column-body interaction** — hovering or clicking anywhere along a spike's
+  rendered body selects its place, instead of requiring the pointer near the
+  base point, with a small pixel tolerance for thin columns.
 - **Synchronized loading** — the loader remains visible until initial imagery
   tiles and station points have rendered together.
 - **Cursor-anchored globe zoom** — wheel input uses MapLibre's native
@@ -57,13 +55,11 @@ rather than by version number. Newest first.
 - **Reliable marker startup** — the place source and marker layers are loaded
   with the initial MapLibre style, preventing missing-layer interaction errors.
 - **Globe-only marker picking** — hover and click candidates must be on the
-  visible hemisphere and within 12 screen pixels of their exact projected
-  coordinates, preventing location tooltips from appearing outside the globe.
+  visible hemisphere, preventing location tooltips from appearing outside the
+  globe.
 - **Versioned marker style assets** — the application script URL is versioned
   so cached copies of an older invalid marker expression are not reused after
   a globe deployment.
-- **Smaller place circles** — marker and glow radii are half their previous
-  size, reducing overlap without shrinking their forgiving interaction area.
 - **Stable station loading** — station data now loads before the results panel
   opens, with existing results left in place during updates. Removing the
   forced loading modal prevents the page from shifting between temporary and

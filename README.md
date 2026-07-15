@@ -17,7 +17,8 @@ No accounts, no ads, no tracking. Just open and listen.
 ### 2026-07-15
 
 - **Globe** — Uses MapLibre GL JS globe projection with tiled Esri satellite
-  imagery, native GPU station markers, and synchronized loading.
+  imagery, 3D spike station markers visible from world view, and synchronized
+  loading.
 - **Streams on HTTPS** — Added a restricted `/listen` proxy so stations using
   plain-HTTP streams can play securely on the deployed HTTPS site.
 - **Offline resilience** — Added a resumable full-directory snapshot and
@@ -37,7 +38,7 @@ For complete details, see the [changelog](CHANGELOG.md).
 
 - **Thousands of stations in 12,000+ cities** worldwide via the [Radio Garden](https://radio.garden/) API
 - **Discover** — Stations from a rotating selection of featured cities around the globe
-- **Globe** — A Radio Garden-style MapLibre globe with tiled satellite imagery and GPU station markers; spin, zoom, and click a city to tune in
+- **Globe** — A Radio Garden-style MapLibre globe with tiled satellite imagery and 3D spike markers for every city; spin, zoom, and click a spike to tune in
 - **Search** — Real-time search by station name or place
 - **Browse by Country** — Drill down from country to city to stations
 - **Browse by City** — Every city on the Radio Garden globe, sorted by station count

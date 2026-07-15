@@ -872,7 +872,7 @@
         const longitude = Number(place.geo[0]);
         const latitude = Number(place.geo[1]);
         const stationWeight = Math.log1p(Number(place.size) || 0);
-        const radiusMeters = 2800 + Math.min(2200, stationWeight * 400);
+        const radiusMeters = 1400 + Math.min(1100, stationWeight * 200);
         const angularRadius = radiusMeters / earthRadiusMeters;
         const latitudeRadians = latitude * Math.PI / 180;
         const longitudeRadians = longitude * Math.PI / 180;
@@ -895,19 +895,6 @@
         }
         return ring;
       }
-      const markerData = {
-        type: 'FeatureCollection',
-        features: markers.map((place) => ({
-          type: 'Feature',
-          id: place.id,
-          properties: {
-            id: place.id,
-            size: Number(place.size) || 0,
-            boost: place.boost ? 1 : 0,
-          },
-          geometry: { type: 'Point', coordinates: place.geo },
-        })),
-      };
       const markerColumnData = {
         type: 'FeatureCollection',
         features: markers.map((place) => ({
@@ -915,39 +902,11 @@
           id: place.id,
           properties: {
             id: place.id,
-            height: Math.round(12000 + Math.min(26000, Math.log1p(Number(place.size) || 0) * 4400)),
+            height: Math.round(160000 + Math.min(240000, Math.log1p(Number(place.size) || 0) * 40000)),
           },
           geometry: { type: 'Polygon', coordinates: [markerColumnRing(place)] },
         })),
       };
-      const markerRadius = [
-        'interpolate', ['linear'], ['zoom'],
-        0, ['+', 3.5, ['*', 0.4, ['ln', ['+', 1, ['get', 'size']]]]],
-        5, ['+', 4.5, ['*', 0.5, ['ln', ['+', 1, ['get', 'size']]]]],
-        12, ['+', 6, ['*', 0.575, ['ln', ['+', 1, ['get', 'size']]]]],
-      ];
-      const markerGlowRadius = [
-        'interpolate', ['linear'], ['zoom'],
-        0, ['+', 6.5, ['*', 0.4, ['ln', ['+', 1, ['get', 'size']]]]],
-        5, ['+', 7.5, ['*', 0.5, ['ln', ['+', 1, ['get', 'size']]]]],
-        12, ['+', 9, ['*', 0.575, ['ln', ['+', 1, ['get', 'size']]]]],
-      ];
-      const markerSurfaceOpacity = [
-        'interpolate', ['linear'], ['zoom'],
-        0, 1,
-        4, 0.85,
-        5.5, 0.08,
-        8.8, 0.08,
-        9, 1,
-      ];
-      const markerGlowOpacity = [
-        'interpolate', ['linear'], ['zoom'],
-        0, 0.42,
-        4, 0.3,
-        5.5, 0,
-        8.8, 0,
-        9, 0.42,
-      ];
       const map = new maplibregl.Map({
         container,
         center: [8, 35],
@@ -972,10 +931,6 @@
               maxzoom: 19,
               attribution: 'Tiles © Esri and imagery contributors',
             },
-            places: {
-              type: 'geojson',
-              data: markerData,
-            },
             'place-columns': {
               type: 'geojson',
               data: markerColumnData,
@@ -988,37 +943,12 @@
               id: 'place-columns',
               type: 'fill-extrusion',
               source: 'place-columns',
-              maxzoom: 9,
               paint: {
                 'fill-extrusion-color': '#24ce83',
                 'fill-extrusion-height': ['get', 'height'],
                 'fill-extrusion-base': 0,
                 'fill-extrusion-opacity': 0.88,
                 'fill-extrusion-vertical-gradient': true,
-              },
-            },
-            {
-              id: 'places-glow',
-              type: 'circle',
-              source: 'places',
-              paint: {
-                'circle-color': '#43f58d',
-                'circle-radius': markerGlowRadius,
-                'circle-opacity': markerGlowOpacity,
-                'circle-blur': 0.75,
-              },
-            },
-            {
-              id: 'places',
-              type: 'circle',
-              source: 'places',
-              paint: {
-                'circle-color': '#55f59a',
-                'circle-stroke-color': '#effff5',
-                'circle-stroke-width': 1.5,
-                'circle-stroke-opacity': markerSurfaceOpacity,
-                'circle-radius': markerRadius,
-                'circle-opacity': markerSurfaceOpacity,
               },
             },
           ],
@@ -1068,28 +998,16 @@
           + Math.cos(centerLatitude) * Math.cos(placeLatitude) * Math.cos(longitudeDelta) > 0;
       }
       function featureNear(point) {
-        if (!map.getLayer('places')) return null;
-        const hitRadius = 12;
-        const hitRadiusSquared = hitRadius * hitRadius;
-        const candidates = map.queryRenderedFeatures([
-          [point.x - hitRadius, point.y - hitRadius],
-          [point.x + hitRadius, point.y + hitRadius],
-        ], { layers: ['places', 'place-columns'] });
-        let nearestFeature = null;
-        let nearestDistance = Infinity;
-        candidates.forEach((feature) => {
+        if (!map.getLayer('place-columns')) return null;
+        const hitPadding = 4;
+        const columnHits = map.queryRenderedFeatures([
+          [point.x - hitPadding, point.y - hitPadding],
+          [point.x + hitPadding, point.y + hitPadding],
+        ], { layers: ['place-columns'] });
+        return columnHits.find((feature) => {
           const place = placeFromFeature(feature);
-          if (!place || !Array.isArray(place.geo) || !isFrontFacing(place)) return;
-          const projected = map.project(place.geo);
-          if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) return;
-          const xDistance = projected.x - point.x;
-          const yDistance = projected.y - point.y;
-          const distance = xDistance * xDistance + yDistance * yDistance;
-          if (distance > hitRadiusSquared || distance >= nearestDistance) return;
-          nearestFeature = feature;
-          nearestDistance = distance;
-        });
-        return nearestFeature;
+          return place && Array.isArray(place.geo) && isFrontFacing(place);
+        }) || null;
       }
       map.on('mousemove', (event) => {
         const feature = featureNear(event.point);
