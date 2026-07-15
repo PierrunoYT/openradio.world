@@ -1267,12 +1267,42 @@ void main() {
         map.getCanvas().style.cursor = '';
         tooltip.classList.add('hidden');
       });
+      const globeView = $('#view-globe');
+      const stationPanelIsStacked = () => window.matchMedia('(max-width: 768px)').matches;
+
+      // Keep the chosen city framed while the station browser opens beside the
+      // globe. Resizing first matters on desktop because the side panel changes
+      // the map's viewport width.
+      const focusPlace = (place, duration = 900) => {
+        stopAutoRotate();
+        requestAnimationFrame(() => {
+          map.resize();
+          map.flyTo({
+            center: place.geo,
+            zoom: Math.max(5, Math.min(7, map.getZoom())),
+            pitch: 20,
+            duration,
+          });
+        });
+      };
+
+      const openPlaceStations = (place) => {
+        globeView.classList.add('has-stations');
+        stationsEl.classList.remove('hidden');
+        stationsEl.innerHTML = '<div class="loading-placeholder"><div class="loader" aria-label="Loading stations"></div></div>';
+        focusPlace(place);
+        showPlaceStations(place, stationsEl, 'Back to Globe', () => {
+          globeView.classList.remove('has-stations');
+          // Once the map expands again, resize and re-center it on the city the
+          // listener just browsed instead of returning to a generic globe view.
+          focusPlace(place, 500);
+        }, { scroll: stationPanelIsStacked() });
+      };
+
       map.on('click', (event) => {
         markerLayer.pick(event.point, (place) => {
           if (!place) return;
-          showPlaceStations(place, stationsEl, 'Back to Globe', () => {
-            stationsEl.classList.add('hidden');
-          }, { scroll: true });
+          openPlaceStations(place);
         });
       });
 
@@ -1301,11 +1331,7 @@ void main() {
           };
 
           const selectPlace = (place) => {
-            stopAutoRotate();
-            map.flyTo({ center: place.geo, zoom: Math.max(2.8, map.getZoom()), pitch: 20, duration: 1600 });
-            showPlaceStations(place, stationsEl, 'Back to Globe', () => {
-              stationsEl.classList.add('hidden');
-            }, { scroll: true });
+            openPlaceStations(place);
             closeResults();
             searchInputEl.value = place.title;
             searchInputEl.blur();

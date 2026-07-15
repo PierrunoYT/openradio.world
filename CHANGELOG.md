@@ -8,6 +8,14 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Station browser now stays beside the selected place** — choosing a city
+  from globe search or by clicking a marker now zooms to a city-level view
+  and opens its stations in a dedicated, independently scrollable side panel
+  on desktop, so the globe remains visible and interactive. Returning with
+  **Back to Globe** expands the map again and re-centers it on the same city
+  instead of losing the selected location. Smaller screens retain the stacked
+  station flow, and the panel shows a loading indicator while stations are
+  fetched.
 - **Find a place on the globe** — the globe was drag/scroll-only with no
   way to jump straight to a country or city, so locating a specific place
   meant manually spinning and zooming. A search box in the globe's
@@ -165,10 +173,10 @@ commit order rather than by version number. Newest change first.
 - **Versioned marker style assets** — the application script URL is versioned
   so cached copies of an older invalid marker expression are not reused after
   a globe deployment.
-- **Stable station loading** — station data now loads before the results panel
-  opens, with existing results left in place during updates. Removing the
-  forced loading modal prevents the page from shifting between temporary and
-  final content heights.
+- **Stable station loading (superseded)** — station data was changed to load
+  before the below-globe results panel opened, with existing results left in
+  place during updates. The newer side-panel flow described above now opens
+  immediately with an in-panel loading indicator instead.
 - **Globe-only marker picking** — hover and click candidates must be on the
   visible hemisphere, preventing location tooltips from appearing outside the
   globe.
@@ -177,8 +185,10 @@ commit order rather than by version number. Newest change first.
 - **Natural single-station cards** — the completed results grid no longer
   inherits the loading panel's height, so a lone station keeps normal card
   proportions instead of stretching into a large block.
-- **Stable globe viewport** — opening station results no longer shrinks or
-  resizes the map; result cards flow below its fixed desktop or mobile height.
+- **Stable globe viewport (superseded on desktop)** — station results were
+  moved below a fixed-size map to prevent viewport changes. The newer desktop
+  layout described above intentionally gives the stations their own side pane;
+  the stacked mobile layout still keeps results below the globe.
 - **Polished imagery credit** — the Esri attribution now uses a compact glass
   pill with clean spacing and responsive sizing instead of an overlapping info
   toggle and text box.

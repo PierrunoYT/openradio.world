@@ -1420,6 +1420,45 @@ input[type="text"] {
   padding-bottom: 24px;
 }
 
+/* Keep the globe in view while browsing a city's stations. On wider screens
+   the station browser is a dedicated side pane rather than content laid over
+   (or scrolled entirely past) the map. */
+@media (min-width: 769px) {
+  #view-globe.active.has-stations {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+    gap: 20px;
+  }
+
+  #view-globe.has-stations #globe-wrap {
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+  }
+
+  #view-globe.has-stations #globe-stations {
+    min-width: 0;
+    height: 100%;
+    margin-top: 0;
+    padding: 16px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    align-content: start;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-1);
+  }
+
+  #view-globe.has-stations .place-stations-header {
+    position: sticky;
+    top: -16px;
+    z-index: 2;
+    margin: -16px -16px 12px;
+    padding: 16px 16px 1px;
+    background: linear-gradient(180deg, var(--bg-1) 82%, transparent);
+  }
+}
+
 @media (max-width: 640px) {
   #globe-wrap {
     flex-basis: 60vh;
