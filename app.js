@@ -981,9 +981,9 @@ out vec4 fragColor;
 void main() {
   float dist = length(v_corner);
   if (dist > 1.0) discard;
-  // Bias the dot slightly toward the camera so the curved globe surface,
-  // which writes depth, occludes back-hemisphere dots without z-fighting
-  // the ones sitting on the visible side.
+  // Horizon culling happens in projectTile before this fragment stage. Bias
+  // surviving front-hemisphere dots slightly toward the camera so they do not
+  // z-fight with the curved satellite surface.
   gl_FragDepth = clamp(gl_FragCoord.z - 0.0015, 0.0, 1.0);
   if (u_pick_mode > 0.5) {
     fragColor = vec4(v_pick, 1.0);
@@ -1072,7 +1072,7 @@ out vec2 v_corner;
 flat out vec3 v_pick;
 flat out float v_selected;
 void main() {
-  vec4 anchor = projectTileFor3D(a_center, 0.0);
+  vec4 anchor = projectTile(a_center);
   float selected = 1.0 - step(0.001, distance(a_pick, u_selected_pick));
   float selectionScale = mix(1.0, 2.4, selected * (1.0 - step(0.5, u_pick_mode)));
   anchor.xy += a_corner * u_dot_radius * selectionScale * 2.0 * anchor.w / u_viewport;

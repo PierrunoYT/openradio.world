@@ -8,6 +8,12 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **Globe markers now stop at the horizon** — the custom station-marker shader
+  now uses MapLibre's globe-aware `projectTile` path, which clips points on the
+  far hemisphere before drawing their billboards. Stations behind the Earth no
+  longer bleed through the satellite surface, while visible marker picking and
+  selected-location rings continue to work.
+
 - **Every station card now links back to the globe** — visible globe controls
   on search, country, city, Discover, and eligible favorite cards tune the
   selected station before opening its city at a close map zoom with the marker
