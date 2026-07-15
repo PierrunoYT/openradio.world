@@ -8,6 +8,17 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-15
 
+- **UI polish pass** — the app-wide dark theme gained depth and hierarchy:
+  Inter as the interface font, subtle purple/green ambient gradients behind
+  the content, gradient-tinted station cards with accent hover glow,
+  purple-tinted favicon tiles, a gradient active state and hover motion in
+  the sidebar nav, a translucent blurred topbar, a glass player bar with an
+  accent hairline and gradient play button, refined chips, thinner
+  scrollbars, and visible keyboard focus outlines. The stylesheet is now
+  cache-busted like app.js.
+- **Fixed truncation under card icons** — a station card's place/country
+  line now ellipsizes instead of running beneath the equalizer and favorite
+  icons on the playing card.
 - **No crash on cached pages** — browsers holding a cached index.html
   receive the newest app.js regardless of the cache-busting query, so the
   info-button wiring could hit missing markup and abort the whole script.
