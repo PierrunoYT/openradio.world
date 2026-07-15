@@ -868,11 +868,17 @@
       const markers = places.filter((place) => Array.isArray(place.geo) && place.geo.length === 2);
       const byId = new Map(markers.map((place) => [place.id, place]));
       const earthRadiusMeters = 6371008.8;
+      function columnRadiusMeters(place) {
+        const stationWeight = Math.log1p(Number(place.size) || 0);
+        return 2600 + Math.min(2000, stationWeight * 360);
+      }
+      function columnHeightMeters(place) {
+        return Math.round(160000 + Math.min(240000, Math.log1p(Number(place.size) || 0) * 40000));
+      }
       function markerColumnRing(place) {
         const longitude = Number(place.geo[0]);
         const latitude = Number(place.geo[1]);
-        const stationWeight = Math.log1p(Number(place.size) || 0);
-        const radiusMeters = 1400 + Math.min(1100, stationWeight * 200);
+        const radiusMeters = columnRadiusMeters(place);
         const angularRadius = radiusMeters / earthRadiusMeters;
         const latitudeRadians = latitude * Math.PI / 180;
         const longitudeRadians = longitude * Math.PI / 180;
@@ -902,7 +908,7 @@
           id: place.id,
           properties: {
             id: place.id,
-            height: Math.round(160000 + Math.min(240000, Math.log1p(Number(place.size) || 0) * 40000)),
+            height: columnHeightMeters(place),
           },
           geometry: { type: 'Polygon', coordinates: [markerColumnRing(place)] },
         })),
@@ -944,10 +950,10 @@
               type: 'fill-extrusion',
               source: 'place-columns',
               paint: {
-                'fill-extrusion-color': '#24ce83',
+                'fill-extrusion-color': '#ff2d78',
                 'fill-extrusion-height': ['get', 'height'],
                 'fill-extrusion-base': 0,
-                'fill-extrusion-opacity': 0.88,
+                'fill-extrusion-opacity': 1,
                 'fill-extrusion-vertical-gradient': true,
               },
             },
@@ -989,29 +995,89 @@
       function placeFromFeature(feature) {
         return feature ? byId.get(feature.properties.id) : null;
       }
-      function isFrontFacing(place) {
+      function frontFacingDot(place) {
         const center = map.getCenter();
         const centerLatitude = center.lat * Math.PI / 180;
         const placeLatitude = Number(place.geo[1]) * Math.PI / 180;
         const longitudeDelta = (Number(place.geo[0]) - center.lng) * Math.PI / 180;
         return Math.sin(centerLatitude) * Math.sin(placeLatitude)
-          + Math.cos(centerLatitude) * Math.cos(placeLatitude) * Math.cos(longitudeDelta) > 0;
+          + Math.cos(centerLatitude) * Math.cos(placeLatitude) * Math.cos(longitudeDelta);
       }
-      function featureNear(point) {
+      // MapLibre only hit-tests the ground footprint of fill-extrusions, so a
+      // click high on a column would miss. Instead, approximate each nearby
+      // column as a screen-space segment from its base toward the globe's rim
+      // and test the pointer against that segment.
+      function placeNear(point) {
         if (!map.getLayer('place-columns')) return null;
-        const hitPadding = 4;
-        const columnHits = map.queryRenderedFeatures([
-          [point.x - hitPadding, point.y - hitPadding],
-          [point.x + hitPadding, point.y + hitPadding],
+        const canvas = map.getCanvas();
+        const center = map.getCenter();
+        const centerScreen = map.project(center);
+        const metersPerPixel = 40075016.686 * Math.cos(center.lat * Math.PI / 180)
+          / (512 * Math.pow(2, map.getZoom()));
+        const maxColumnPixels = Math.min(
+          Math.hypot(canvas.clientWidth || canvas.width, canvas.clientHeight || canvas.height),
+          400000 / metersPerPixel,
+        ) + 30;
+        let towardCenterX = centerScreen.x - point.x;
+        let towardCenterY = centerScreen.y - point.y;
+        const towardCenterLength = Math.hypot(towardCenterX, towardCenterY);
+        if (towardCenterLength > 1) {
+          towardCenterX = towardCenterX / towardCenterLength * maxColumnPixels;
+          towardCenterY = towardCenterY / towardCenterLength * maxColumnPixels;
+        } else {
+          towardCenterX = 0;
+          towardCenterY = maxColumnPixels;
+        }
+        const pad = 14;
+        const candidates = map.queryRenderedFeatures([
+          [Math.min(point.x, point.x + towardCenterX) - pad, Math.min(point.y, point.y + towardCenterY) - pad],
+          [Math.max(point.x, point.x + towardCenterX) + pad, Math.max(point.y, point.y + towardCenterY) + pad],
         ], { layers: ['place-columns'] });
-        return columnHits.find((feature) => {
+        const pitchRadians = map.getPitch() * Math.PI / 180;
+        const seen = new Set();
+        let nearestPlace = null;
+        let nearestDistance = Infinity;
+        candidates.forEach((feature) => {
           const place = placeFromFeature(feature);
-          return place && Array.isArray(place.geo) && isFrontFacing(place);
-        }) || null;
+          if (!place || seen.has(place.id) || !Array.isArray(place.geo)) return;
+          seen.add(place.id);
+          const facing = frontFacingDot(place);
+          if (facing <= 0) return;
+          const base = map.project(place.geo);
+          if (!Number.isFinite(base.x) || !Number.isFinite(base.y)) return;
+          let directionX = base.x - centerScreen.x;
+          let directionY = base.y - centerScreen.y;
+          const directionLength = Math.hypot(directionX, directionY);
+          if (directionLength > 24) {
+            directionX /= directionLength;
+            directionY /= directionLength;
+          } else {
+            directionX = 0;
+            directionY = -1;
+          }
+          const sinTheta = Math.sqrt(Math.max(0, 1 - facing * facing));
+          const tilt = Math.max(0.15, sinTheta * Math.cos(pitchRadians) + facing * Math.sin(pitchRadians));
+          const lengthPixels = columnHeightMeters(place) / metersPerPixel * tilt;
+          const segmentX = directionX * lengthPixels;
+          const segmentY = directionY * lengthPixels;
+          const segmentLengthSquared = segmentX * segmentX + segmentY * segmentY;
+          let along = 0;
+          if (segmentLengthSquared > 0) {
+            along = ((point.x - base.x) * segmentX + (point.y - base.y) * segmentY) / segmentLengthSquared;
+            along = Math.max(0, Math.min(1, along));
+          }
+          const closestX = base.x + segmentX * along;
+          const closestY = base.y + segmentY * along;
+          const distance = Math.hypot(point.x - closestX, point.y - closestY);
+          const tolerance = Math.max(9, columnRadiusMeters(place) / metersPerPixel + 4);
+          if (distance > tolerance || distance >= nearestDistance) return;
+          nearestPlace = place;
+          nearestDistance = distance;
+        });
+        return nearestPlace;
       }
       map.on('mousemove', (event) => {
-        const feature = featureNear(event.point);
-        const place = placeFromFeature(feature);
+        const place = placeNear(event.point);
         map.getCanvas().style.cursor = place ? 'pointer' : '';
         if (!place) {
           tooltip.classList.add('hidden');
@@ -1027,7 +1093,7 @@
         tooltip.classList.add('hidden');
       });
       map.on('click', (event) => {
-        const place = placeFromFeature(featureNear(event.point));
+        const place = placeNear(event.point);
         if (!place) return;
         showPlaceStations(place, stationsEl, 'Back to Globe', () => {
           stationsEl.classList.add('hidden');
