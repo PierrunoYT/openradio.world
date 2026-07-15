@@ -30,16 +30,17 @@ rather than by version number. Newest first.
   level-of-detail tile pyramid up to level 19, so finer imagery streams in as
   the camera approaches instead of stretching one global image.
 - **High-visibility place markers** — all 12,326 places are rendered in native
-  MapLibre GeoJSON circle layers with station-weighted sizes, a bright outline,
-  and a soft glow that remains legible over satellite imagery.
+  MapLibre GeoJSON circle layers with compact station-weighted sizes, a bright
+  outline, and a soft glow that remains legible over satellite imagery.
 - **Forgiving marker interaction** — rendered-feature picking uses a 12-pixel
   tolerance around the pointer, making even small and densely packed places
   easier to hover and select while remaining aligned with the globe.
 - **Synchronized loading** — the loader remains visible until initial imagery
   tiles and station points have rendered together.
-- **Direct globe zoom** — wheel input applies proportional, cursor-anchored
-  zoom updates without MapLibre's built-in easing, while the buttons move one
-  level immediately. Zoom levels 0 through 19 match the satellite imagery.
+- **Cursor-anchored globe zoom** — wheel input uses MapLibre's native
+  screen-space anchor so the location beneath the pointer stays in place,
+  while the buttons move one level immediately. Zoom levels 0 through 19 match
+  the satellite imagery.
 - **Readable attribution** — Esri imagery credits now use a high-contrast dark
   control with light text and links.
 - **Lower background cost** — animation stops whenever another app view is
@@ -51,6 +52,8 @@ rather than by version number. Newest first.
 
 - **Reliable marker startup** — the place source and marker layers are loaded
   with the initial MapLibre style, preventing missing-layer interaction errors.
+- **Smaller place circles** — marker and glow radii are half their previous
+  size, reducing overlap without shrinking their forgiving interaction area.
 
 ### Added
 

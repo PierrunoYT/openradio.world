@@ -883,15 +883,15 @@
       };
       const markerRadius = [
         'interpolate', ['linear'], ['zoom'],
-        0, ['+', 7, ['*', 0.8, ['ln', ['+', 1, ['get', 'size']]]]],
-        5, ['+', 9, ['*', 1, ['ln', ['+', 1, ['get', 'size']]]]],
-        12, ['+', 12, ['*', 1.15, ['ln', ['+', 1, ['get', 'size']]]]],
+        0, ['+', 3.5, ['*', 0.4, ['ln', ['+', 1, ['get', 'size']]]]],
+        5, ['+', 4.5, ['*', 0.5, ['ln', ['+', 1, ['get', 'size']]]]],
+        12, ['+', 6, ['*', 0.575, ['ln', ['+', 1, ['get', 'size']]]]],
       ];
       const markerGlowRadius = [
         'interpolate', ['linear'], ['zoom'],
-        0, ['+', 13, ['*', 0.8, ['ln', ['+', 1, ['get', 'size']]]]],
-        5, ['+', 15, ['*', 1, ['ln', ['+', 1, ['get', 'size']]]]],
-        12, ['+', 18, ['*', 1.15, ['ln', ['+', 1, ['get', 'size']]]]],
+        0, ['+', 6.5, ['*', 0.4, ['ln', ['+', 1, ['get', 'size']]]]],
+        5, ['+', 7.5, ['*', 0.5, ['ln', ['+', 1, ['get', 'size']]]]],
+        12, ['+', 9, ['*', 0.575, ['ln', ['+', 1, ['get', 'size']]]]],
       ];
       const map = new maplibregl.Map({
         container,
@@ -903,7 +903,7 @@
         bearing: 0,
         attributionControl: false,
         doubleClickZoom: false,
-        scrollZoom: false,
+        scrollZoom: true,
         reduceMotion: true,
         pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
         style: {
@@ -981,6 +981,7 @@
         rotateFrame = 0;
       };
       container.addEventListener('pointerdown', stopAutoRotate);
+      map.on('wheel', stopAutoRotate);
 
       function placeFromFeature(feature) {
         return feature ? byId.get(feature.properties.id) : null;
@@ -1025,22 +1026,12 @@
       ]);
       wrap.classList.remove('is-loading');
 
-      function zoomBy(delta, around) {
+      function zoomBy(delta) {
         stopAutoRotate();
         map.stop();
         const zoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), map.getZoom() + delta));
-        if (around) map.easeTo({ zoom, around, duration: 0 });
-        else map.jumpTo({ zoom });
+        map.jumpTo({ zoom });
       }
-      container.addEventListener('wheel', (event) => {
-        event.preventDefault();
-        if (!event.deltaY) return;
-        const modeScale = event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? container.clientHeight : 1;
-        const delta = Math.max(-0.5, Math.min(0.5, -event.deltaY * modeScale / 400));
-        const rect = map.getCanvas().getBoundingClientRect();
-        const around = map.unproject([event.clientX - rect.left, event.clientY - rect.top]);
-        zoomBy(delta, around);
-      }, { passive: false });
       $('#globe-zoom-in').addEventListener('click', () => zoomBy(1));
       $('#globe-zoom-out').addEventListener('click', () => zoomBy(-1));
 
