@@ -173,8 +173,20 @@ async function main() {
   const all = Object.values(stations);
   const withStream = all.filter((s) => s.streamUrl).length;
   writeFileSync(STATIONS_FILE, JSON.stringify(all, null, 2) + '\n');
+
+  // Allowlist of plain-http stream hosts for the mixed-content proxy (functions/listen.js)
+  const httpHosts = new Set();
+  for (const s of all) {
+    if (!s.streamUrl || !s.streamUrl.startsWith('http://')) continue;
+    try {
+      httpHosts.add(new URL(s.streamUrl).host);
+    } catch {}
+  }
+  writeFileSync(join(DATA_DIR, 'stream-hosts.json'), JSON.stringify([...httpHosts].sort(), null, 2) + '\n');
+
   console.log('=== Done ===');
   console.log(`${all.length} stations (${withStream} with resolved stream URLs) -> data/stations.json`);
+  console.log(`${httpHosts.size} http stream hosts -> data/stream-hosts.json`);
 }
 
 main().catch((err) => {

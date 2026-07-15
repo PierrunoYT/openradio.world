@@ -133,9 +133,26 @@
     };
   }
 
+  // On an https page, plain-http audio is blocked as mixed content;
+  // route those streams through our own proxy (functions/listen.js)
+  function proxiedIfNeeded(url) {
+    if (url.startsWith('http://') && location.protocol === 'https:') {
+      return `/listen?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+  }
+
   function streamUrl(station) {
-    // Legacy favorites (from the Radio Browser era) carry their own stream URL
-    return station.streamUrl || `${API_BASE}/ara/content/listen/${station.id}/channel.mp3`;
+    // Snapshot data and legacy favorites carry their own stream URL
+    if (station.streamUrl) {
+      return proxiedIfNeeded(station.streamUrl);
+    }
+    // Live API station whose stream is insecure: the listen redirect would
+    // land on http:// and be blocked on an https page — use the proxy
+    if (station.secure === false && location.protocol === 'https:') {
+      return `/listen?id=${encodeURIComponent(station.id)}`;
+    }
+    return `${API_BASE}/ara/content/listen/${station.id}/channel.mp3`;
   }
 
   async function getPlaceStations(placeId) {
@@ -795,7 +812,7 @@
         const saved = snap.stations.find((s) => s.id === currentStation.id);
         if (saved && saved.streamUrl) {
           console.log('Falling back to snapshot stream URL...');
-          attemptPlay(saved.streamUrl);
+          attemptPlay(proxiedIfNeeded(saved.streamUrl));
           return;
         }
       } catch {}
