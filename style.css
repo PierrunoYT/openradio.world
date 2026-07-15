@@ -215,6 +215,20 @@ input[type="text"] {
   line-height: 1.6;
 }
 
+.sidebar-footer .github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.sidebar-footer .github-link:hover {
+  color: var(--accent-light);
+}
+
 .version {
   margin-top: 2px;
 }
