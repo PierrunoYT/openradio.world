@@ -106,7 +106,7 @@ async function main() {
   const places = placesData.data.list
     .filter((p) => p.title && p.country)
     .map((p) => ({ id: p.id, title: p.title, country: p.country, size: p.size, boost: !!p.boost, geo: p.geo }));
-  writeFileSync(PLACES_FILE, JSON.stringify(places));
+  writeFileSync(PLACES_FILE, JSON.stringify(places, null, 2) + '\n');
   console.log(`${places.length} places -> data/places.json`);
 
   const progress = loadProgress();
@@ -172,7 +172,7 @@ async function main() {
 
   const all = Object.values(stations);
   const withStream = all.filter((s) => s.streamUrl).length;
-  writeFileSync(STATIONS_FILE, JSON.stringify(all));
+  writeFileSync(STATIONS_FILE, JSON.stringify(all, null, 2) + '\n');
   console.log('=== Done ===');
   console.log(`${all.length} stations (${withStream} with resolved stream URLs) -> data/stations.json`);
 }
