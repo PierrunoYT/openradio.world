@@ -10,25 +10,20 @@ rather than by version number. Newest first.
 
 ### Changed
 
-- **Radio Garden-style place markers** — the complete directory of 12,326
-  places is represented by bright green, screen-space dots that stay crisp
-  and visible at every distance. Geographic level-of-detail clustering keeps
-  the world view readable and progressively reveals every place while
-  zooming; marker size reflects the number of nearby stations.
-- **Fast marker rendering** — city points moved from thousands of 3D
-  cylinders to one lightweight canvas pass over the WebGL earth. Only
-  front-facing markers are projected, globe.gl's expensive pointer raycasting
-  remains disabled, and hover/click use a sphere hit plus nearest-place lookup.
-- **Blue Marble globe** — the current earth uses locally served 4K NASA Blue
-  Marble imagery, a 2K topology bump map, and an atmosphere glow. This
-  supersedes the earlier same-day CPU-textured and Natural Earth vector
-  iterations while retaining smooth GPU interaction.
-- **Lower background cost** — render resolution is capped on high-DPI
-  screens, the high-performance GPU is requested, and the globe animation
-  pauses whenever another app view is open.
-- **Faster first and offline open** — globe code and textures warm during
-  browser idle time. If the live API is unavailable, the globe now loads only
-  the places snapshot instead of also parsing the 10 MB station catalog.
+- **Rewritten from scratch** — the globe is now a dependency-free
+  orthographic renderer built on one Canvas 2D element. It no longer depends
+  on globe.gl, WebGL, raster earth textures, or topology maps.
+- **Radio Garden-style place markers** — all 12,326 places are projected from
+  their actual coordinates as bright green points. Marker size reflects the
+  city's station count and featured cities remain emphasized.
+- **New globe design** — a shaded ocean, atmospheric rim, geographic grid,
+  and simplified Natural Earth country outlines stay sharp at any size.
+- **Direct interaction** — drag rotation, wheel and button zoom, hover
+  tooltips, and city selection are handled directly by the canvas renderer.
+- **Lower background cost** — animation stops whenever another app view is
+  open, and render resolution is capped on high-DPI screens.
+- **Faster first and offline open** — only the small country geometry and
+  places snapshot are needed to render the globe.
 
 ### Added
 
