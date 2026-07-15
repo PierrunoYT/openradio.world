@@ -32,6 +32,9 @@ rather than by version number. Newest first.
 - **High-visibility place markers** — all 12,326 places are rendered in native
   MapLibre GeoJSON circle layers with compact station-weighted sizes, a bright
   outline, and a soft glow that remains legible over satellite imagery.
+- **Raised marker tiles** — a dark viewport-aligned side and inset sheen give
+  each compact place marker a subtle puck-like height without changing its
+  top size or making it grow disproportionately while zooming.
 - **Forgiving marker interaction** — rendered-feature picking uses a 12-pixel
   tolerance around the pointer, making even small and densely packed places
   easier to hover and select while remaining aligned with the globe.

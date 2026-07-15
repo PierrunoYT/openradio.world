@@ -892,6 +892,7 @@
         5, ['+', 7.5, ['*', 0.5, ['ln', ['+', 1, ['get', 'size']]]]],
         12, ['+', 9, ['*', 0.575, ['ln', ['+', 1, ['get', 'size']]]]],
       ];
+      const markerSheenRadius = ['*', markerRadius, 0.55];
       const map = new maplibregl.Map({
         container,
         center: [8, 35],
@@ -936,6 +937,20 @@
               },
             },
             {
+              id: 'places-depth',
+              type: 'circle',
+              source: 'places',
+              paint: {
+                'circle-color': '#08704a',
+                'circle-stroke-color': '#03482f',
+                'circle-stroke-width': 1,
+                'circle-radius': markerRadius,
+                'circle-translate': [0, 2.25],
+                'circle-translate-anchor': 'viewport',
+                'circle-opacity': 0.98,
+              },
+            },
+            {
               id: 'places',
               type: 'circle',
               source: 'places',
@@ -945,6 +960,19 @@
                 'circle-stroke-width': 1.5,
                 'circle-radius': markerRadius,
                 'circle-opacity': 1,
+              },
+            },
+            {
+              id: 'places-sheen',
+              type: 'circle',
+              source: 'places',
+              paint: {
+                'circle-color': '#eafff1',
+                'circle-radius': markerSheenRadius,
+                'circle-translate': [-0.8, -0.8],
+                'circle-translate-anchor': 'viewport',
+                'circle-opacity': 0.34,
+                'circle-blur': 0.45,
               },
             },
           ],
