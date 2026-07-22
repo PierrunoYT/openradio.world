@@ -47,11 +47,11 @@
   <text x="70" y="377" fill="#a9b0bd" font-family="Arial, sans-serif" font-size="25">Live radio from thousands of stations around the world.</text>
   <g font-family="Arial, sans-serif" font-size="18" font-weight="700">
     <rect x="70" y="432" width="180" height="48" rx="24" fill="#151a22" stroke="#edf9db" stroke-opacity=".14"/>
-    <text x="160" y="456" fill="#f7f8f3" text-anchor="middle" dominant-baseline="middle">38K+ stations</text>
+    <text x="160" y="463" fill="#f7f8f3" text-anchor="middle">38K+ stations</text>
     <rect x="266" y="432" width="180" height="48" rx="24" fill="#151a22" stroke="#edf9db" stroke-opacity=".14"/>
-    <text x="356" y="456" fill="#f7f8f3" text-anchor="middle" dominant-baseline="middle">190+ countries</text>
+    <text x="356" y="463" fill="#f7f8f3" text-anchor="middle">190+ countries</text>
     <rect x="462" y="432" width="180" height="48" rx="24" fill="#151a22" stroke="#edf9db" stroke-opacity=".14"/>
-    <text x="552" y="456" fill="#f7f8f3" text-anchor="middle" dominant-baseline="middle">Free forever</text>
+    <text x="552" y="463" fill="#f7f8f3" text-anchor="middle">Free forever</text>
   </g>
   <text x="70" y="558" fill="#c8f65a" font-family="Arial, sans-serif" font-size="24" font-weight="700" letter-spacing="1">openradio.world</text>
 </svg>
