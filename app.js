@@ -398,8 +398,14 @@
         const block = document.createElement('div');
         block.className = 'section-block';
         block.innerHTML = `
-          <h3 class="section-title">📍 ${escapeHtml(place.title)}, ${escapeHtml(place.country)}</h3>
-          <div class="stations-grid loading-placeholder"><div class="loader"></div></div>`;
+          <div class="section-heading">
+            <div>
+              <span class="section-kicker">Broadcasting from ${escapeHtml(place.country)}</span>
+              <h3 class="section-title">${escapeHtml(place.title)}</h3>
+            </div>
+            <span class="section-live"><i></i> Live now</span>
+          </div>
+          <div class="stations-grid discover-grid loading-placeholder"><div class="loader"></div></div>`;
         container.appendChild(block);
 
         const grid = block.querySelector('.stations-grid');
