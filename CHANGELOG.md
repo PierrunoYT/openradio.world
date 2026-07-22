@@ -13,7 +13,9 @@ commit order rather than by version number. Newest change first.
   responsive layouts. Updated the visible logo, favicon, Apple touch icon, PWA
   icons, maskable icon, and Open Graph preview to use the same broadcast-wave
   identity. Static CSS, JavaScript, and social-image URLs now carry fresh cache
-  keys so the deployed redesign appears immediately.
+  keys so the deployed redesign appears immediately. Hero and station-card
+  surfaces use consistent solid ink tones instead of broad color fades, keeping
+  the lime accents crisp and card rows visually even.
 
 ---
 

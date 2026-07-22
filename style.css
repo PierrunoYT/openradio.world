@@ -456,9 +456,7 @@ input[type="text"] {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 30px;
-  background:
-    linear-gradient(115deg, rgba(200, 246, 90, 0.12), transparent 42%),
-    linear-gradient(145deg, #171c24 0%, #10131a 58%, #131720 100%);
+  background: #12171e;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 24px 70px rgba(0, 0, 0, 0.22);
 }
 
@@ -690,21 +688,8 @@ input[type="text"] {
   align-items: end;
   gap: 16px 10px;
   border-radius: 22px;
-  background:
-    radial-gradient(circle at 15% 0%, rgba(200, 246, 90, 0.12), transparent 44%),
-    linear-gradient(150deg, #171c25, #10141b);
-}
-
-.discover-grid .station-card:nth-child(3n + 2) {
-  background:
-    radial-gradient(circle at 15% 0%, rgba(114, 230, 193, 0.12), transparent 44%),
-    linear-gradient(150deg, #171c25, #10141b);
-}
-
-.discover-grid .station-card:nth-child(3n + 3) {
-  background:
-    radial-gradient(circle at 15% 0%, rgba(162, 134, 255, 0.13), transparent 44%),
-    linear-gradient(150deg, #171c25, #10141b);
+  background: #121720;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
 .discover-grid .station-card:hover {
@@ -721,9 +706,8 @@ input[type="text"] {
   height: 58px;
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 17px;
-  background: rgba(255, 255, 255, 0.06);
+  background: #1a2027;
   color: var(--amber);
-  backdrop-filter: blur(8px);
 }
 
 .discover-grid .station-info {
@@ -789,7 +773,7 @@ input[type="text"] {
 }
 
 .station-card {
-  background: linear-gradient(180deg, rgba(190, 205, 240, 0.03) 0%, rgba(190, 205, 240, 0) 55%), var(--card);
+  background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 14px;
@@ -797,14 +781,14 @@ input[type="text"] {
   align-items: center;
   gap: 12px;
   cursor: pointer;
-  transition: background var(--transition), border-color var(--transition),
+  transition: background-color var(--transition), border-color var(--transition),
     transform var(--transition), box-shadow var(--transition);
   position: relative;
   overflow: hidden;
 }
 
 .station-card:hover {
-  background: linear-gradient(180deg, rgba(190, 205, 240, 0.05) 0%, rgba(190, 205, 240, 0) 55%), var(--card-hover);
+  background: var(--card-hover);
   border-color: rgba(200, 246, 90, 0.4);
   transform: translateY(-2px);
   box-shadow: 0 12px 28px rgba(2, 4, 10, 0.4), 0 2px 12px rgba(200, 246, 90, 0.08);
@@ -819,8 +803,13 @@ input[type="text"] {
 .station-card.playing::before {
   content: '';
   position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(74, 246, 137, 0.1) 0%, transparent 55%);
+  top: 0;
+  right: 16px;
+  left: 16px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: var(--live);
+  box-shadow: 0 0 10px var(--live-glow);
   pointer-events: none;
 }
 
@@ -833,7 +822,7 @@ input[type="text"] {
   height: 48px;
   border-radius: var(--radius-sm);
   object-fit: cover;
-  background: linear-gradient(135deg, rgba(200, 246, 90, 0.18) 0%, rgba(17, 22, 36, 0.95) 62%);
+  background: #1a2027;
   border: 1px solid var(--border);
   flex-shrink: 0;
   display: flex;
@@ -897,7 +886,7 @@ input[type="text"] {
 @media (hover: none) {
 
   .station-card:active {
-    background: linear-gradient(180deg, rgba(190, 205, 240, 0.05) 0%, rgba(190, 205, 240, 0) 55%), var(--card-hover);
+    background: var(--card-hover);
     transform: scale(0.99);
   }
 }
