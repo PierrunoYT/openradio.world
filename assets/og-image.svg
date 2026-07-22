@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="90" y1="20" x2="1130" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#171c24"/>
+      <stop offset=".52" stop-color="#0f1319"/>
+      <stop offset="1" stop-color="#090b10"/>
+    </linearGradient>
+    <linearGradient id="signal" x1="836" y1="142" x2="1055" y2="455" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#dcff88"/>
+      <stop offset=".58" stop-color="#c8f65a"/>
+      <stop offset="1" stop-color="#72e6c1"/>
+    </linearGradient>
+    <radialGradient id="limeGlow" cx=".75" cy=".42" r=".55">
+      <stop stop-color="#c8f65a" stop-opacity=".2"/>
+      <stop offset="1" stop-color="#c8f65a" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1" fill="#edf9db" fill-opacity=".1"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#limeGlow)"/>
+  <rect width="1200" height="630" fill="url(#dots)" opacity=".55"/>
+  <circle cx="940" cy="315" r="245" fill="none" stroke="#c8f65a" stroke-opacity=".12" stroke-width="2"/>
+  <circle cx="940" cy="315" r="176" fill="none" stroke="#72e6c1" stroke-opacity=".14" stroke-width="2"/>
+  <circle cx="940" cy="315" r="112" fill="#c8f65a"/>
+  <g fill="#18200c">
+    <rect x="902" y="291" width="9" height="48" rx="4.5"/>
+    <rect x="919" y="275" width="9" height="80" rx="4.5"/>
+    <rect x="936" y="257" width="9" height="116" rx="4.5"/>
+    <rect x="953" y="275" width="9" height="80" rx="4.5"/>
+    <rect x="970" y="291" width="9" height="48" rx="4.5"/>
+  </g>
+  <circle cx="819" cy="171" r="7" fill="#c8f65a"/>
+  <circle cx="1083" cy="377" r="7" fill="#72e6c1"/>
+  <rect x="70" y="68" width="62" height="62" rx="16" fill="#c8f65a"/>
+  <g transform="translate(80 78) scale(1.75)" fill="none" stroke="#18200c" stroke-width="2" stroke-linecap="round">
+    <circle cx="12" cy="12" r="2" fill="#18200c" stroke="none"/>
+    <path d="M16.24 7.76a6 6 0 0 1 0 8.49"/>
+    <path d="M7.76 16.25a6 6 0 0 1 0-8.49"/>
+    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+    <path d="M4.93 19.07a10 10 0 0 1 0-14.14"/>
+  </g>
+  <text x="150" y="111" fill="#f7f8f3" font-family="Arial, sans-serif" font-size="38" font-weight="700">OpenRadio</text>
+  <text x="70" y="246" fill="#f7f8f3" font-family="Arial, sans-serif" font-size="66" font-weight="700">Find your new</text>
+  <text x="70" y="319" fill="#c8f65a" font-family="Arial, sans-serif" font-size="66" font-weight="700">favorite frequency.</text>
+  <text x="70" y="377" fill="#a9b0bd" font-family="Arial, sans-serif" font-size="25">Live radio from thousands of stations around the world.</text>
+  <g font-family="Arial, sans-serif" font-size="18" font-weight="700">
+    <rect x="70" y="432" width="165" height="48" rx="24" fill="#151a22" stroke="#edf9db" stroke-opacity=".14"/>
+    <circle cx="94" cy="456" r="5" fill="#72e6c1"/>
+    <text x="109" y="463" fill="#f7f8f3">38K+ stations</text>
+    <rect x="249" y="432" width="165" height="48" rx="24" fill="#151a22" stroke="#edf9db" stroke-opacity=".14"/>
+    <text x="274" y="463" fill="#f7f8f3">190+ countries</text>
+    <rect x="428" y="432" width="132" height="48" rx="24" fill="#151a22" stroke="#edf9db" stroke-opacity=".14"/>
+    <text x="453" y="463" fill="#f7f8f3">Free forever</text>
+  </g>
+  <text x="70" y="558" fill="#c8f65a" font-family="Arial, sans-serif" font-size="24" font-weight="700" letter-spacing="1">openradio.world</text>
+</svg>

@@ -6,6 +6,17 @@ commit order rather than by version number. Newest change first.
 
 ---
 
+## 2026-07-22
+
+- **Refreshed interface and branding** — redesigned Discover with a stronger
+  editorial hero, spacious station cards, electric-lime accents, and improved
+  responsive layouts. Updated the visible logo, favicon, Apple touch icon, PWA
+  icons, maskable icon, and Open Graph preview to use the same broadcast-wave
+  identity. Static CSS, JavaScript, and social-image URLs now carry fresh cache
+  keys so the deployed redesign appears immediately.
+
+---
+
 ## 2026-07-15
 
 - **Added Privacy Policy, Terms of Use, and Disclaimer pages** — three new
