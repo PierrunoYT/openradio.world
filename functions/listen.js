@@ -15,8 +15,35 @@ const API_BASE = 'https://radio.garden/api';
 // Radio Garden challenges non-browser user agents
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36';
+const MAX_REDIRECTS = 5;
 
 const hostSet = new Set(STREAM_HOSTS);
+
+function isAllowedStreamUrl(url) {
+  return (url.protocol === 'http:' || url.protocol === 'https:') && hostSet.has(url.host);
+}
+
+async function fetchAllowedStream(target) {
+  let current = target;
+
+  for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
+    const upstream = await fetch(current, {
+      headers: { 'User-Agent': UA, 'Icy-MetaData': '0' },
+      redirect: 'manual',
+    });
+
+    if (![301, 302, 303, 307, 308].includes(upstream.status)) return upstream;
+
+    const location = upstream.headers.get('Location');
+    if (!location || redirects === MAX_REDIRECTS) {
+      throw new Error('Invalid upstream redirect');
+    }
+
+    const next = new URL(location, current);
+    if (!isAllowedStreamUrl(next)) throw new Error('Redirect host not allowed');
+    current = next;
+  }
+}
 
 export async function onRequestGet({ request }) {
   const params = new URL(request.url).searchParams;
@@ -36,7 +63,7 @@ export async function onRequestGet({ request }) {
     } catch {
       return new Response('Invalid url', { status: 400 });
     }
-    if ((u.protocol !== 'http:' && u.protocol !== 'https:') || !hostSet.has(u.host)) {
+    if (!isAllowedStreamUrl(u)) {
       return new Response('Host not allowed', { status: 403 });
     }
     target = u.toString();
@@ -46,10 +73,12 @@ export async function onRequestGet({ request }) {
 
   let upstream;
   try {
-    upstream = await fetch(target, {
-      headers: { 'User-Agent': UA, 'Icy-MetaData': '0' },
-      redirect: 'follow',
-    });
+    upstream = url
+      ? await fetchAllowedStream(target)
+      : await fetch(target, {
+          headers: { 'User-Agent': UA, 'Icy-MetaData': '0' },
+          redirect: 'follow',
+        });
   } catch {
     return new Response('Upstream fetch failed', { status: 502 });
   }
@@ -60,7 +89,9 @@ export async function onRequestGet({ request }) {
 
   // Pass the audio through, keeping only the headers that matter
   const headers = new Headers();
-  headers.set('Content-Type', upstream.headers.get('Content-Type') || 'audio/mpeg');
+  headers.set('Content-Type', 'audio/mpeg');
   headers.set('Cache-Control', 'no-store');
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('Content-Security-Policy', "sandbox; default-src 'none'");
   return new Response(upstream.body, { status: 200, headers });
 }

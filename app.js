@@ -895,6 +895,8 @@
   // projection, raster imagery tiles, and markers rendered in the map scene.
   const MAPLIBRE_VERSION = '5.24.0';
   const MAPLIBRE_BASE = `https://cdn.jsdelivr.net/npm/maplibre-gl@${MAPLIBRE_VERSION}/dist`;
+  const MAPLIBRE_JS_INTEGRITY = 'sha384-5+cfbwT0iiub6VsQAdn6yz16nr6sDiQoHx6tm4O8OVYXHYOxcffFmCJBL0dgdvGp';
+  const MAPLIBRE_CSS_INTEGRITY = 'sha384-uTttxo/aOKbdE5RlD/SPzSDoDmNvGlUYPjONi2MN/b7c9HPSvW07OIuyP7uL6jxK';
   let mapLibrePromise = null;
   let mapLibreGlobePromise = null;
 
@@ -905,12 +907,16 @@
       const link = document.createElement('link');
       link.rel = 'stylesheet';
       link.href = `${MAPLIBRE_BASE}/maplibre-gl.css`;
+      link.integrity = MAPLIBRE_CSS_INTEGRITY;
+      link.crossOrigin = 'anonymous';
       link.dataset.maplibre = '';
       document.head.appendChild(link);
     }
     mapLibrePromise = new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = `${MAPLIBRE_BASE}/maplibre-gl.js`;
+      script.integrity = MAPLIBRE_JS_INTEGRITY;
+      script.crossOrigin = 'anonymous';
       script.onload = () => resolve(window.maplibregl);
       script.onerror = () => reject(new Error('Failed to load MapLibre GL JS'));
       document.head.appendChild(script);
@@ -1449,7 +1455,7 @@ void main() {
                   (place, i) => `
                     <div class="globe-search-result" data-idx="${i}" role="option">
                       <span class="name">${escapeHtml(place.title)}</span>
-                      <span class="meta">${escapeHtml(place.country)} · ${place.size} station${place.size === 1 ? '' : 's'}</span>
+                      <span class="meta">${escapeHtml(place.country)} · ${Number(place.size) || 0} station${Number(place.size) === 1 ? '' : 's'}</span>
                     </div>
                   `,
                 )
@@ -1701,7 +1707,7 @@ void main() {
       page.forEach((p) => {
         const chip = document.createElement('button');
         chip.className = 'tag-chip';
-        chip.innerHTML = `${escapeHtml(p.title)} <span class="tag-count">${p.size}</span>`;
+        chip.innerHTML = `${escapeHtml(p.title)} <span class="tag-count">${Number(p.size) || 0}</span>`;
         chip.addEventListener('click', () => onSelect(p));
         frag.appendChild(chip);
       });
@@ -1886,7 +1892,7 @@ void main() {
   }
 
   function updateFavoriteButtons(id) {
-    $$(`.btn-fav[data-id="${id}"]`).forEach((btn) => {
+    $$(`.btn-fav[data-id="${CSS.escape(String(id))}"]`).forEach((btn) => {
       btn.classList.toggle('active', isFavorite(id));
       btn.innerHTML = isFavorite(id)
         ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>'
