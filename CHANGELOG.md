@@ -6,6 +6,32 @@ commit order rather than by version number. Newest change first.
 
 ---
 
+## 2026-07-30
+
+- **Rebuilt the interface design from scratch — "Console"** — `style.css` and
+  `legal.css` were rewritten as a single new design system modelled on a
+  broadcast desk. The app shell is now three floating graphite panels on a
+  ruled ink bed instead of edge-to-edge flat panes, with a new type stack
+  (Bricolage Grotesque for display, Inter for UI, JetBrains Mono for every
+  number the radio reports: station counts, bitrates, place metadata). Lime
+  stays the brand colour and now marks only what you can interact with, while
+  a new tally amber marks only what is on air — the live pills, the playing
+  card's edge strip, the player's segment mark and its ON AIR lamp. Station
+  cards, chips, empty states, globe overlays, the player dock, and the mobile
+  drawer were all redrawn against the new tokens. Application logic is
+  untouched: every id, class, and state hook `app.js` drives is preserved.
+
+- **Legal pages rejoined the app's design** — `privacy.html`, `terms.html`, and
+  `disclaimer.html` were still rendering the retired amber palette and the old
+  font stack; they now share the Console tokens, and their brand mark uses the
+  current lime identity.
+
+- **Refreshed theme colours and cache keys** — `theme-color` and the PWA
+  manifest colours moved to the new `#070908` ink, and the stylesheet URLs
+  carry fresh `?v=console-1` keys so the redesign appears immediately.
+
+---
+
 ## 2026-07-22
 
 - **Refreshed interface and branding** — redesigned Discover with a stronger
