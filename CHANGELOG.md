@@ -100,6 +100,26 @@ commit order rather than by version number. Newest change first.
 
 ---
 
+## 2026-07-27
+
+- **Hardened the stream proxy and script loading** — `functions/listen.js`'s
+  redirect-following mode (`redirect: 'follow'`) trusted wherever a station's
+  upstream redirected to; it now follows redirects manually, capped at 5 hops,
+  validating each hop's host against the same allowlist as direct requests, so
+  a compromised or malicious upstream can't redirect the proxy into fetching
+  an arbitrary URL. Proxied responses also get a locked-down
+  `Content-Security-Policy: sandbox; default-src 'none'` and
+  `X-Content-Type-Options: nosniff`, and no longer forward the upstream's
+  claimed `Content-Type` verbatim. The MapLibre GL script and stylesheet
+  loaded from jsdelivr now carry Subresource Integrity hashes and
+  `crossorigin="anonymous"`, and a new `_headers` file adds a site-wide CSP,
+  `X-Frame-Options: DENY`, and `Referrer-Policy`. Also fixed a stored-XSS-style
+  selector-injection risk (`updateFavoriteButtons` now runs station ids through
+  `CSS.escape` before building a `querySelectorAll` string) and two spots
+  rendering unsanitized `place.size` as a station count.
+
+---
+
 ## 2026-07-22
 
 - **Refreshed interface and branding** — redesigned Discover with a stronger
@@ -110,6 +130,11 @@ commit order rather than by version number. Newest change first.
   keys so the deployed redesign appears immediately. Hero and station-card
   surfaces use consistent solid ink tones instead of broad color fades, keeping
   the lime accents crisp and card rows visually even.
+
+- **Straightened the social preview card** — two small alignment passes on
+  `assets/og-image.svg` right after the branding refresh: centered the card's
+  text labels and lined up its stat cards. Superseded a week later by the full
+  globe-based redraw.
 
 ---
 
