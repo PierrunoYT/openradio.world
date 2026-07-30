@@ -1,7 +1,7 @@
 /* ============================================================
    OpenRadio — legal page styles
-   Shares the "Console" tokens with style.css, but these documents
-   scroll normally instead of living in the app's fixed shell.
+   Shares the "Atlas" tokens with style.css, but these documents
+   scroll normally instead of living over the app's globe canvas.
    ============================================================ */
 
 :root {

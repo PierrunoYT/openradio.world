@@ -20,9 +20,6 @@
   const FAV_KEY = 'openradio_favorites';
   const VOL_KEY = 'openradio_volume';
   const LAST_STATION_KEY = 'openradio_last_station';
-  const DISCOVER_SECTIONS = 3;
-  const DISCOVER_LIMIT = 12;
-  const CHIP_PAGE_SIZE = 200;
 
   let currentStation = null;
   let currentList = [];
@@ -30,7 +27,6 @@
   let isPlaying = false;
   let isLoading = false;
   let favorites = {};
-  let searchTimeout = null;
   let placesCache = null;
   let placesPromise = null;
   let refreshGlobeMarkers = null;
@@ -59,47 +55,35 @@
   const heartFilled = $('#heart-filled');
   const volIcon = $('#vol-icon');
   const volMuteIcon = $('#vol-mute-icon');
-  const searchBar = $('#search-bar');
-  const searchInput = $('#search-input');
-  const searchClear = $('#search-clear');
-  const viewTitle = $('#view-title');
-  const sidebarToggle = $('#sidebar-toggle');
-  const sidebar = $('#sidebar');
+  const btnLocate = $('#btn-locate');
+  const btnSurprise = $('#btn-surprise');
   const favCountBadge = $('#fav-count');
-  const discoverRefresh = $('#discover-refresh') || createDiscoverRefreshButton();
 
-  function createDiscoverRefreshButton() {
-    const button = document.createElement('button');
-    button.id = 'discover-refresh';
-    button.className = 'hidden';
-    button.type = 'button';
-    button.setAttribute('aria-label', 'Refresh Discover stations');
-    button.title = 'Refresh Discover stations';
-    button.innerHTML = `
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-      <span>Refresh</span>`;
-    viewTitle.insertAdjacentElement('afterend', button);
-    return button;
-  }
+  // Command palette — the single entry point for finding anything.
+  const palette = $('#palette');
+  const paletteInput = $('#palette-input');
+  const paletteResults = $('#palette-results');
+  const searchTrigger = $('#search-trigger');
+
+  // Favorites sheet, and the scrim shared by both overlays.
+  const favoritesPanel = $('#favorites-panel');
+  const favoritesList = $('#favorites-list');
+  const btnFavorites = $('#btn-favorites');
+  const scrim = $('#scrim');
 
   // ===== Initialize =====
   function init() {
     loadFavorites();
     loadVolume();
     setupEventListeners();
-    setupSidebarBackdrop();
-    navigateTo('discover');
 
-    // Warm the globe library and vector country geometry once the initial view
-    // has settled so opening the globe does not start those downloads.
-    const warmGlobe = () => loadMapLibre().catch(() => {
-      // Opening the Globe view retries and displays an error if loading fails.
-    });
-    if ('requestIdleCallback' in window) {
-      window.requestIdleCallback(warmGlobe, { timeout: 2000 });
-    } else {
-      setTimeout(warmGlobe, 1200);
+    // Show the shortcut the way this platform writes it.
+    if (/Mac|iPhone|iPad/.test(navigator.platform || '')) {
+      $('#search-trigger-key').textContent = '⌘K';
     }
+
+    // The globe is the app, not a view you navigate to: build it immediately.
+    loadMapLibreGlobe();
   }
 
   // ===== API Helpers =====
@@ -287,69 +271,24 @@
   }
 
   // ===== Navigation =====
-  const views = {
-    discover: { title: 'Discover', showSearch: false },
-    globe: { title: 'Globe', showSearch: false },
-    search: { title: 'Search', showSearch: true },
-    favorites: { title: 'Favorites', showSearch: false },
-    countries: { title: 'Browse by Country', showSearch: false },
-    cities: { title: 'Browse by City', showSearch: false },
-  };
+  // There is only ever one view: the globe. Everything else is an overlay on
+  // top of it, so the render loop below never has to be torn down.
+  const currentView = 'globe';
 
-  let currentView = 'discover';
+  let activeOverlay = null; // 'palette' | 'favorites' | null
 
-  function navigateTo(view) {
-    currentView = view;
-    const config = views[view];
-
-    // Pause the GPU render loop whenever the globe is not visible.
-    if (window.__globe) {
-      if (view === 'globe') window.__globe.resumeAnimation();
-      else window.__globe.pauseAnimation();
-    }
-
-    $$('.nav-btn').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.view === view);
-    });
-
-    $$('.view').forEach((v) => v.classList.remove('active'));
-    $(`#view-${view}`).classList.add('active');
-
-    viewTitle.textContent = config.title;
-    viewTitle.classList.toggle('hidden', config.showSearch);
-    searchBar.classList.toggle('hidden', !config.showSearch);
-    discoverRefresh.classList.toggle('hidden', view !== 'discover');
-
-    if (config.showSearch) {
-      searchInput.focus();
-    }
-
-    closeSidebar();
-    loadView(view);
+  function setScrim(visible) {
+    scrim.classList.toggle('hidden', !visible);
+    requestAnimationFrame(() => scrim.classList.toggle('is-visible', visible));
   }
 
-  async function loadView(view) {
-    switch (view) {
-      case 'discover':
-        loadDiscover();
-        break;
-      case 'globe':
-        loadMapLibreGlobe();
-        break;
-      case 'favorites':
-        renderFavorites();
-        break;
-      case 'countries':
-        loadCountries();
-        break;
-      case 'cities':
-        loadCities();
-        break;
-    }
+  function closeOverlay() {
+    if (activeOverlay === 'palette') closePalette();
+    else if (activeOverlay === 'favorites') closeFavorites();
   }
 
   async function showPlaceOnGlobe(place, options = {}) {
-    navigateTo('globe');
+    closeOverlay();
     await loadMapLibreGlobe();
     if (!openGlobePlace) {
       showToast('The globe could not be loaded. Please try again.');
@@ -373,65 +312,281 @@
     return showPlaceOnGlobe(place, { markLocation: true });
   }
 
-  // ===== Discover View =====
-  let discoverLoaded = false;
-  let discoverLoading = false;
+  // ===== Command Palette =====
+  // One field resolves everything the old Search / By Country / By City views
+  // used to: cities, countries, and stations, ranked together.
+  const PALETTE_PLACE_LIMIT = 7;
+  const PALETTE_STATION_LIMIT = 6;
+  const PALETTE_SUGGESTIONS = 6;
 
-  async function loadDiscover(force = false) {
-    if (discoverLoading || (discoverLoaded && !force)) return;
-    discoverLoading = true;
-    discoverRefresh.disabled = true;
-    discoverRefresh.setAttribute('aria-busy', 'true');
+  let paletteToken = 0;
+  let paletteItems = [];
+  let paletteIndex = -1;
+  let paletteTimer = null;
 
-    const container = $('#discover-sections');
-    container.innerHTML = '<div class="loading-placeholder"><div class="loader"></div></div>';
+  function openPalette(prefill = '') {
+    if (activeOverlay === 'favorites') closeFavorites();
+    activeOverlay = 'palette';
+    palette.classList.remove('hidden');
+    setScrim(true);
+    requestAnimationFrame(() => palette.classList.add('is-visible'));
+    paletteInput.value = prefill;
+    paletteInput.focus();
+    paletteInput.select();
+    runPalette(prefill);
+  }
 
+  function closePalette() {
+    if (activeOverlay !== 'palette') return;
+    activeOverlay = null;
+    paletteToken++;
+    if (paletteTimer) clearTimeout(paletteTimer);
+    palette.classList.remove('is-visible');
+    paletteInput.setAttribute('aria-expanded', 'false');
+    paletteInput.blur();
+    setScrim(false);
+
+    const finish = () => {
+      if (activeOverlay === 'palette') return;
+      palette.classList.add('hidden');
+      paletteResults.innerHTML = '';
+      paletteItems = [];
+      paletteIndex = -1;
+    };
+    if (prefersReducedMotion()) finish();
+    else setTimeout(finish, 180);
+  }
+
+  // Same ranking the globe's own place lookup used: exact prefixes first,
+  // then substring hits, with the busiest places breaking ties.
+  function matchPlaces(places, raw) {
+    const q = raw.trim().toLowerCase();
+    if (!q) return [];
+    const scored = [];
+    for (const place of places) {
+      const title = (place.title || '').toLowerCase();
+      const country = (place.country || '').toLowerCase();
+      let score;
+      if (title === q) score = 0;
+      else if (title.startsWith(q)) score = 1;
+      else if (country.startsWith(q)) score = 2;
+      else if (title.includes(q)) score = 3;
+      else if (country.includes(q)) score = 4;
+      else continue;
+      scored.push({ place, score });
+    }
+    scored.sort((a, b) => a.score - b.score
+      || (Number(b.place.size) || 0) - (Number(a.place.size) || 0));
+    return scored.map((entry) => entry.place);
+  }
+
+  function paletteRowHtml(item, index) {
+    const active = index === paletteIndex ? ' active' : '';
+    if (item.kind === 'place') {
+      const count = Number(item.place.size) || 0;
+      return `
+        <button class="palette-row${active}" role="option" type="button" data-idx="${index}" aria-selected="${index === paletteIndex}">
+          <span class="palette-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          </span>
+          <span class="palette-text">
+            <span class="palette-title">${escapeHtml(item.place.title)}</span>
+            <span class="palette-sub">${escapeHtml(item.place.country || '')}</span>
+          </span>
+          <span class="palette-tag">${count} station${count === 1 ? '' : 's'}</span>
+        </button>`;
+    }
+    const where = [item.station.place, item.station.country].filter(Boolean).join(' · ');
+    return `
+      <button class="palette-row${active}" role="option" type="button" data-idx="${index}" aria-selected="${index === paletteIndex}">
+        <span class="palette-icon palette-icon-station" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49"/><path d="M7.76 16.25a6 6 0 0 1 0-8.49"/></svg>
+        </span>
+        <span class="palette-text">
+          <span class="palette-title">${escapeHtml(item.station.name)}</span>
+          <span class="palette-sub">${escapeHtml(where)}</span>
+        </span>
+        <span class="palette-tag palette-tag-play">Tune in</span>
+      </button>`;
+  }
+
+  function renderPalette(items, options = {}) {
+    paletteItems = items;
+    if (paletteIndex >= items.length) paletteIndex = items.length - 1;
+    if (items.length && paletteIndex < 0) paletteIndex = 0;
+
+    const groups = [];
+    const places = items.filter((item) => item.kind === 'place');
+    const stations = items.filter((item) => item.kind === 'station');
+
+    if (places.length) {
+      groups.push(`<p class="palette-group">${escapeHtml(options.placeLabel || 'Places')}</p>`);
+      groups.push(...places.map((item) => paletteRowHtml(item, items.indexOf(item))));
+    }
+    if (stations.length) {
+      groups.push(`<p class="palette-group">${escapeHtml(options.stationLabel || 'Stations')}</p>`);
+      groups.push(...stations.map((item) => paletteRowHtml(item, items.indexOf(item))));
+    }
+    if (options.pendingStations) {
+      groups.push('<p class="palette-group">Stations</p>');
+      groups.push('<div class="palette-pending"><div class="loader loader-sm"></div>Searching stations…</div>');
+    }
+    if (!groups.length) {
+      groups.push(`
+        <div class="palette-empty">
+          <p>Nothing matched that.</p>
+          <span>Try a city, a country, or part of a station name.</span>
+        </div>`);
+    }
+
+    paletteResults.innerHTML = groups.join('');
+    paletteInput.setAttribute('aria-expanded', items.length ? 'true' : 'false');
+    scrollPaletteIntoView();
+  }
+
+  function scrollPaletteIntoView() {
+    const row = paletteResults.querySelector('.palette-row.active');
+    if (row) row.scrollIntoView({ block: 'nearest' });
+  }
+
+  function movePaletteSelection(delta) {
+    if (!paletteItems.length) return;
+    paletteIndex = (paletteIndex + delta + paletteItems.length) % paletteItems.length;
+    paletteResults.querySelectorAll('.palette-row').forEach((row) => {
+      const active = Number(row.dataset.idx) === paletteIndex;
+      row.classList.toggle('active', active);
+      row.setAttribute('aria-selected', String(active));
+    });
+    scrollPaletteIntoView();
+  }
+
+  function choosePalette(index = paletteIndex) {
+    const item = paletteItems[index];
+    if (!item) return;
+    if (item.kind === 'place') {
+      showPlaceOnGlobe(item.place);
+    } else {
+      currentList = [item.station];
+      currentIndex = 0;
+      playStation(item.station);
+      showStationOnGlobe(item.station).catch(() => {
+        // Playback already started; the globe simply could not follow along.
+      });
+    }
+    closePalette();
+  }
+
+  // Empty field: offer somewhere to go rather than a blank sheet.
+  async function renderPaletteSuggestions(token) {
+    const favList = Object.values(favorites).slice(0, 3);
+    let places = [];
+    try {
+      const all = await getPlaces();
+      const boosted = all.filter((place) => place.boost);
+      const pool = boosted.length >= PALETTE_SUGGESTIONS ? boosted : all.filter((place) => place.size > 40);
+      places = shuffle(pool.slice()).slice(0, PALETTE_SUGGESTIONS);
+    } catch {
+      places = [];
+    }
+    if (token !== paletteToken) return;
+
+    renderPalette([
+      ...places.map((place) => ({ kind: 'place', place })),
+      ...favList.map((station) => ({ kind: 'station', station })),
+    ], { placeLabel: 'On air somewhere', stationLabel: 'Your favorites' });
+  }
+
+  function runPalette(raw) {
+    const query = raw.trim();
+    const token = ++paletteToken;
+    paletteIndex = query ? 0 : -1;
+    if (paletteTimer) clearTimeout(paletteTimer);
+
+    if (!query) {
+      renderPaletteSuggestions(token);
+      return;
+    }
+
+    // Places live in memory, so they answer instantly; stations need the API
+    // and arrive underneath a moment later.
+    getPlaces()
+      .catch(() => [])
+      .then((places) => {
+        if (token !== paletteToken) return;
+        const matched = matchPlaces(places, query).slice(0, PALETTE_PLACE_LIMIT);
+        renderPalette(matched.map((place) => ({ kind: 'place', place })), { pendingStations: true });
+
+        paletteTimer = setTimeout(async () => {
+          let stations = [];
+          try {
+            stations = await searchStations(query);
+          } catch (err) {
+            console.warn('Palette station search failed:', err);
+          }
+          if (token !== paletteToken) return;
+          renderPalette([
+            ...matched.map((place) => ({ kind: 'place', place })),
+            ...stations.slice(0, PALETTE_STATION_LIMIT).map((station) => ({ kind: 'station', station })),
+          ]);
+        }, SEARCH_DEBOUNCE);
+      });
+  }
+
+  // ===== Favorites sheet =====
+  function openFavorites() {
+    if (activeOverlay === 'palette') closePalette();
+    activeOverlay = 'favorites';
+    renderFavorites();
+    favoritesPanel.classList.remove('hidden');
+    setScrim(true);
+    requestAnimationFrame(() => favoritesPanel.classList.add('is-visible'));
+    btnFavorites.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeFavorites() {
+    if (activeOverlay !== 'favorites') return;
+    activeOverlay = null;
+    favoritesPanel.classList.remove('is-visible');
+    btnFavorites.setAttribute('aria-expanded', 'false');
+    setScrim(false);
+
+    const finish = () => {
+      if (activeOverlay === 'favorites') return;
+      favoritesPanel.classList.add('hidden');
+    };
+    if (prefersReducedMotion()) finish();
+    else setTimeout(finish, 240);
+  }
+
+  function toggleFavoritesPanel() {
+    if (activeOverlay === 'favorites') closeFavorites();
+    else openFavorites();
+  }
+
+  // ===== Surprise me =====
+  // Serendipity replaces the old Discover view: drop the listener into a real
+  // place on the globe instead of showing three lists of cards.
+  let surprising = false;
+
+  async function surpriseMe() {
+    if (surprising) return;
+    surprising = true;
+    btnSurprise.disabled = true;
+    btnSurprise.setAttribute('aria-busy', 'true');
     try {
       const places = await getPlaces();
-      const featured = places.filter((p) => p.boost);
-      const pool = featured.length >= DISCOVER_SECTIONS ? featured : places.filter((p) => p.size > 20);
-      const picks = shuffle(pool).slice(0, DISCOVER_SECTIONS);
-
-      container.innerHTML = '';
-
-      await Promise.all(picks.map(async (place) => {
-        const block = document.createElement('div');
-        block.className = 'section-block';
-        block.innerHTML = `
-          <div class="section-heading">
-            <div>
-              <span class="section-kicker">Broadcasting from ${escapeHtml(place.country)}</span>
-              <h3 class="section-title">${escapeHtml(place.title)}</h3>
-            </div>
-            <span class="section-live"><i></i> Live now</span>
-          </div>
-          <div class="stations-grid discover-grid loading-placeholder"><div class="loader"></div></div>`;
-        container.appendChild(block);
-
-        const grid = block.querySelector('.stations-grid');
-        try {
-          const stations = await getPlaceStations(place.id);
-          grid.classList.remove('loading-placeholder');
-          grid.innerHTML = '';
-          appendStationCards(grid, stations.slice(0, DISCOVER_LIMIT), stations);
-        } catch {
-          grid.classList.remove('loading-placeholder');
-          grid.innerHTML = '<div class="empty-state"><p>Failed to load stations</p></div>';
-        }
-      }));
-
-      discoverLoaded = true;
+      const boosted = places.filter((place) => place.boost);
+      const pool = boosted.length ? boosted : places.filter((place) => place.size > 20);
+      if (!pool.length) throw new Error('No places available');
+      const place = pool[Math.floor(Math.random() * pool.length)];
+      await showPlaceOnGlobe(place, { markLocation: true });
     } catch (err) {
-      console.error('Failed to load discover:', err);
-      container.innerHTML = `
-        <div class="empty-state">
-          <p>Failed to load stations. Use Refresh to try again.</p>
-          <span>Check your internet connection and try again</span>
-        </div>`;
+      console.error('Surprise me failed:', err);
+      showToast('Could not reach the station directory. Please try again.');
     } finally {
-      discoverLoading = false;
-      discoverRefresh.disabled = false;
-      discoverRefresh.removeAttribute('aria-busy');
+      surprising = false;
+      btnSurprise.disabled = false;
+      btnSurprise.removeAttribute('aria-busy');
     }
   }
 
@@ -752,7 +907,7 @@
       if (Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY) > 6) return;
       const hit = markerAt(e);
       if (hit) {
-        showPlaceStations(hit, stationsEl, 'Back to Globe', () => {
+        showPlaceStations(hit, stationsEl, 'Close', () => {
           stationsEl.classList.add('hidden');
         }, { scroll: true });
       }
@@ -1388,7 +1543,7 @@ void main() {
         focusPlace(place, options.markLocation ? {
           zoom: Math.max(8, Math.min(10, map.getZoom())),
         } : {});
-        showPlaceStations(place, stationsEl, 'Back to Globe', () => {
+        showPlaceStations(place, stationsEl, 'Close', () => {
           globeView.classList.remove('has-stations');
           // Once the map expands again, resize and re-center it on the city the
           // listener just browsed instead of returning to a generic globe view.
@@ -1412,115 +1567,6 @@ void main() {
           openPlaceStations(place);
         });
       });
-
-      // Search box overlay: type a country/city and fly the camera there.
-      // Guarded: a cached index.html may not contain this markup yet.
-      {
-        const searchBox = $('#globe-search');
-        const searchInputEl = $('#globe-search-input');
-        const resultsEl = $('#globe-search-results');
-        if (searchBox && searchInputEl && resultsEl) {
-          let activeIndex = -1;
-          let currentMatches = [];
-
-          const updateActive = () => {
-            resultsEl.querySelectorAll('.globe-search-result').forEach((el, i) => {
-              el.classList.toggle('active', i === activeIndex);
-            });
-          };
-
-          const closeResults = () => {
-            resultsEl.classList.add('hidden');
-            resultsEl.innerHTML = '';
-            searchInputEl.setAttribute('aria-expanded', 'false');
-            activeIndex = -1;
-            currentMatches = [];
-          };
-
-          const selectPlace = (place) => {
-            openPlaceStations(place);
-            closeResults();
-            searchInputEl.value = place.title;
-            searchInputEl.blur();
-          };
-
-          const renderResults = (matches) => {
-            currentMatches = matches;
-            activeIndex = -1;
-            if (!matches.length) {
-              resultsEl.innerHTML = '<div class="globe-search-result"><span class="meta">No places found</span></div>';
-            } else {
-              resultsEl.innerHTML = matches
-                .map(
-                  (place, i) => `
-                    <div class="globe-search-result" data-idx="${i}" role="option">
-                      <span class="name">${escapeHtml(place.title)}</span>
-                      <span class="meta">${escapeHtml(place.country)} · ${Number(place.size) || 0} station${Number(place.size) === 1 ? '' : 's'}</span>
-                    </div>
-                  `,
-                )
-                .join('');
-            }
-            resultsEl.classList.remove('hidden');
-            searchInputEl.setAttribute('aria-expanded', 'true');
-          };
-
-          const runQuery = (raw) => {
-            const q = raw.trim().toLowerCase();
-            if (!q) {
-              closeResults();
-              return;
-            }
-            const scored = [];
-            for (const place of markers) {
-              const title = place.title.toLowerCase();
-              const country = (place.country || '').toLowerCase();
-              let score;
-              if (title.startsWith(q)) score = 0;
-              else if (country.startsWith(q)) score = 1;
-              else if (title.includes(q)) score = 2;
-              else if (country.includes(q)) score = 3;
-              else continue;
-              scored.push({ place, score });
-            }
-            scored.sort((a, b) => a.score - b.score || (Number(b.place.size) || 0) - (Number(a.place.size) || 0));
-            renderResults(scored.slice(0, 8).map((s) => s.place));
-          };
-
-          searchInputEl.addEventListener('input', (event) => runQuery(event.target.value));
-
-          searchInputEl.addEventListener('keydown', (event) => {
-            if (!currentMatches.length) return;
-            if (event.key === 'ArrowDown') {
-              event.preventDefault();
-              activeIndex = Math.min(activeIndex + 1, currentMatches.length - 1);
-              updateActive();
-            } else if (event.key === 'ArrowUp') {
-              event.preventDefault();
-              activeIndex = Math.max(activeIndex - 1, 0);
-              updateActive();
-            } else if (event.key === 'Enter') {
-              event.preventDefault();
-              selectPlace(currentMatches[activeIndex >= 0 ? activeIndex : 0]);
-            } else if (event.key === 'Escape') {
-              closeResults();
-              searchInputEl.blur();
-            }
-          });
-
-          resultsEl.addEventListener('click', (event) => {
-            const row = event.target.closest('.globe-search-result');
-            if (!row || row.dataset.idx === undefined) return;
-            const idx = Number(row.dataset.idx);
-            if (currentMatches[idx]) selectPlace(currentMatches[idx]);
-          });
-
-          document.addEventListener('click', (event) => {
-            if (searchBox.contains(event.target)) return;
-            closeResults();
-          });
-        }
-      }
 
       await Promise.race([
         map.once('idle'),
@@ -1560,51 +1606,6 @@ void main() {
     return mapLibreGlobePromise;
   }
 
-  // ===== Search =====
-  function handleSearch(query) {
-    if (searchTimeout) clearTimeout(searchTimeout);
-
-    searchClear.classList.toggle('hidden', !query);
-
-    if (!query.trim()) {
-      renderSearchEmpty();
-      return;
-    }
-
-    searchTimeout = setTimeout(async () => {
-      const container = $('#search-results');
-      container.innerHTML = '<div class="loading-placeholder"><div class="loader"></div></div>';
-
-      try {
-        const stations = await searchStations(query);
-
-        container.innerHTML = '';
-
-        if (stations.length === 0) {
-          container.innerHTML = `
-            <div class="empty-state">
-              <p>No stations found</p>
-              <span>Try a different search term</span>
-            </div>`;
-        } else {
-          appendStationCards(container, stations, undefined, { showOnGlobe: true });
-        }
-      } catch (err) {
-        console.error('Search failed:', err);
-        showError('search-results', 'Search failed. Please try again.');
-      }
-    }, SEARCH_DEBOUNCE);
-  }
-
-  function renderSearchEmpty() {
-    $('#search-results').innerHTML = `
-      <div class="empty-state">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <p>Search for radio stations worldwide</p>
-        <span>Type a station name or place</span>
-      </div>`;
-  }
-
   // ===== Shared: station list for a place =====
   const placeStationRequests = new WeakMap();
 
@@ -1628,15 +1629,19 @@ void main() {
     stationsEl.classList.remove('hidden', 'is-loading', 'is-ready');
     stationsEl.classList.add('place-stations-panel');
     if (!wasVisible) stationsEl.classList.remove('is-visible');
+    const count = stations.length;
     stationsEl.innerHTML = `
-      <div class="place-stations-header">
-        <button class="back-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-          ${escapeHtml(backLabel)}
+      <header class="place-stations-header">
+        <div class="place-heading">
+          <span class="place-kicker">${escapeHtml(place.country)}</span>
+          <h2 class="place-title">${escapeHtml(place.title)}</h2>
+          <p class="place-count">${count} station${count === 1 ? '' : 's'} on air</p>
+        </div>
+        <button class="back-btn icon-btn" type="button" aria-label="${escapeAttr(backLabel)}" title="${escapeAttr(backLabel)}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
-        <h3 class="section-title">${escapeHtml(place.title)}, ${escapeHtml(place.country)}</h3>
-      </div>
-      <div class="place-stations-results" aria-live="polite"></div>`;
+      </header>
+      <div class="place-stations-results stations-list" aria-live="polite"></div>`;
 
     const results = stationsEl.querySelector('.place-stations-results');
     if (loadError) {
@@ -1692,145 +1697,6 @@ void main() {
     });
   }
 
-  function renderPlaceChips(container, places, onSelect) {
-    container.innerHTML = '';
-    let shown = 0;
-
-    function renderPage() {
-      const wrapper = container.querySelector('.load-more-wrapper');
-      if (wrapper) wrapper.remove();
-
-      const page = places.slice(shown, shown + CHIP_PAGE_SIZE);
-      shown += page.length;
-
-      const frag = document.createDocumentFragment();
-      page.forEach((p) => {
-        const chip = document.createElement('button');
-        chip.className = 'tag-chip';
-        chip.innerHTML = `${escapeHtml(p.title)} <span class="tag-count">${Number(p.size) || 0}</span>`;
-        chip.addEventListener('click', () => onSelect(p));
-        frag.appendChild(chip);
-      });
-      container.appendChild(frag);
-
-      if (shown < places.length) {
-        const more = document.createElement('div');
-        more.className = 'load-more-wrapper';
-        more.style.flexBasis = '100%';
-        more.innerHTML = '<button class="load-more-btn">Load More Cities</button>';
-        more.querySelector('.load-more-btn').addEventListener('click', renderPage);
-        container.appendChild(more);
-      }
-    }
-
-    renderPage();
-  }
-
-  // ===== Countries =====
-  let countriesLoaded = false;
-
-  async function loadCountries() {
-    if (countriesLoaded) return;
-
-    try {
-      const places = await getPlaces();
-
-      // Group places by country, summing station counts
-      const byCountry = new Map();
-      places.forEach((p) => {
-        const entry = byCountry.get(p.country) || { name: p.country, count: 0, places: [] };
-        entry.count += p.size;
-        entry.places.push(p);
-        byCountry.set(p.country, entry);
-      });
-
-      const countries = [...byCountry.values()].sort((a, b) => b.count - a.count);
-
-      const container = $('#countries-list');
-      container.classList.remove('loading-placeholder');
-      container.innerHTML = '';
-
-      const frag = document.createDocumentFragment();
-      countries.forEach((c) => {
-        const chip = document.createElement('button');
-        chip.className = 'tag-chip';
-        chip.innerHTML = `${escapeHtml(c.name)} <span class="tag-count">${c.count}</span>`;
-        chip.addEventListener('click', () => showCountryCities(c));
-        frag.appendChild(chip);
-      });
-      container.appendChild(frag);
-
-      countriesLoaded = true;
-    } catch (err) {
-      console.error('Failed to load countries:', err);
-    }
-  }
-
-  function showCountryCities(country) {
-    const listEl = $('#countries-list');
-    const citiesEl = $('#country-cities');
-    const stationsEl = $('#country-stations');
-
-    listEl.classList.add('hidden');
-    stationsEl.classList.add('hidden');
-    citiesEl.classList.remove('hidden');
-
-    citiesEl.innerHTML = `
-      <div style="flex-basis:100%">
-        <button class="back-btn" id="back-countries">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-          Back to Countries
-        </button>
-        <h3 class="section-title">${escapeHtml(country.name)}</h3>
-      </div>`;
-
-    $('#back-countries').addEventListener('click', () => {
-      citiesEl.classList.add('hidden');
-      listEl.classList.remove('hidden');
-    });
-
-    const chipArea = document.createElement('div');
-    chipArea.className = 'tags-grid';
-    chipArea.style.flexBasis = '100%';
-    citiesEl.appendChild(chipArea);
-
-    const sorted = country.places.slice().sort((a, b) => b.size - a.size);
-    renderPlaceChips(chipArea, sorted, (place) => {
-      citiesEl.classList.add('hidden');
-      showPlaceStations(place, stationsEl, 'Back to Cities', () => {
-        stationsEl.classList.add('hidden');
-        citiesEl.classList.remove('hidden');
-      }, { showOnGlobe: true });
-    });
-  }
-
-  // ===== Cities =====
-  let citiesLoaded = false;
-
-  async function loadCities() {
-    if (citiesLoaded) return;
-
-    try {
-      const places = await getPlaces();
-      const sorted = places.slice().sort((a, b) => b.size - a.size);
-
-      const container = $('#cities-list');
-      container.classList.remove('loading-placeholder');
-
-      renderPlaceChips(container, sorted, (place) => {
-        container.classList.add('hidden');
-        showPlaceStations(place, $('#city-stations'), 'Back to Cities', () => {
-          $('#city-stations').classList.add('hidden');
-          container.classList.remove('hidden');
-        }, { showOnGlobe: true });
-      });
-
-      citiesLoaded = true;
-    } catch (err) {
-      console.error('Failed to load cities:', err);
-    }
-  }
-
   // ===== Favorites =====
   function loadFavorites() {
     try {
@@ -1876,7 +1742,7 @@ void main() {
     saveFavorites();
     updateFavoriteButtons(id);
 
-    if (currentView === 'favorites') {
+    if (activeOverlay === 'favorites') {
       renderFavorites();
     }
   }
@@ -1912,65 +1778,73 @@ void main() {
   }
 
   function renderFavorites() {
-    const container = $('#favorites-list');
     const favList = Object.values(favorites);
 
     if (favList.length === 0) {
-      container.innerHTML = `
+      favoritesList.innerHTML = `
         <div class="empty-state">
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
           <p>No favorites yet</p>
-          <span>Click the heart icon on any station to save it here</span>
+          <span>Tap the heart on any station and it will wait for you here.</span>
         </div>`;
       return;
     }
 
-    container.classList.remove('loading-placeholder');
-    container.innerHTML = '';
-    appendStationCards(container, favList);
+    favoritesList.innerHTML = '';
+    appendStationCards(favoritesList, favList);
   }
 
-  // ===== Render Station Cards =====
+  // ===== Render Station Rows =====
+  // Rows live inside panels now, so the play target is a real <button>: the
+  // whole list is reachable and operable from the keyboard.
   function appendStationCards(container, stations, fullList, options = {}) {
     const frag = document.createDocumentFragment();
     // fullList is the complete list (for prev/next beyond what's rendered)
     const playableList = fullList || stations;
+    const offset = Number(options.startIndex) || 0;
 
-    stations.forEach((station) => {
-      const card = document.createElement('div');
-      card.className = 'station-card';
+    stations.forEach((station, i) => {
+      const row = document.createElement('div');
+      row.className = 'station-row';
       if (currentStation && currentStation.id === station.id && isPlaying) {
-        card.classList.add('playing');
+        row.classList.add('playing');
       }
-      card.dataset.id = station.id;
+      row.dataset.id = station.id;
 
-      const tags = [station.place, station.country].filter(Boolean).join(' / ');
+      const where = [station.place, station.country].filter(Boolean).join(' · ');
       const fav = isFavorite(station.id);
+      const ordinal = String(offset + i + 1).padStart(2, '0');
+      const showGlobe = options.showOnGlobe !== false && (station.placeId || station.place);
 
-      card.innerHTML = `
-        <div class="station-favicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49"/><path d="M7.76 16.25a6 6 0 0 1 0-8.49"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 19.07a10 10 0 0 1 0-14.14"/></svg></div>
-        <div class="station-info">
-          <span class="station-name" title="${escapeAttr(station.name)}">${escapeHtml(station.name)}</span>
-          <span class="station-tags">${escapeHtml(tags)}</span>
-        </div>
-        <div class="now-playing-indicator">
-          <span></span><span></span><span></span><span></span>
-        </div>
+      row.innerHTML = `
+        <button class="station-main" type="button" title="${escapeAttr(station.name)}">
+          <span class="station-index" aria-hidden="true">${ordinal}</span>
+          <span class="station-cue" aria-hidden="true">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </span>
+          <span class="station-body">
+            <span class="station-name">${escapeHtml(station.name)}</span>
+            <span class="station-where">${escapeHtml(where)}</span>
+          </span>
+          <span class="now-playing-indicator" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </span>
+        </button>
         <div class="station-actions">
-          ${options.showOnGlobe !== false && (station.placeId || station.place) ? `
+          ${showGlobe ? `
             <button class="btn-globe" type="button" aria-label="Show ${escapeAttr(station.place || 'station')} on globe" title="Show on globe">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
             </button>` : ''}
-          <button class="btn-fav ${fav ? 'active' : ''}" data-id="${escapeAttr(station.id)}" aria-label="Toggle favorite" title="Toggle favorite">
+          <button class="btn-fav ${fav ? 'active' : ''}" type="button" data-id="${escapeAttr(station.id)}" aria-label="Toggle favorite" title="Toggle favorite">
             ${
               fav
-                ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>'
-                : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>'
+                ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>'
+                : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>'
             }
           </button>
         </div>`;
 
-      card.addEventListener('click', (e) => {
+      row.addEventListener('click', (e) => {
         if (e.target.closest('.btn-fav')) {
           toggleFavorite(station);
           return;
@@ -2003,7 +1877,7 @@ void main() {
         if (options.onSelect) options.onSelect(station);
       });
 
-      frag.appendChild(card);
+      frag.appendChild(row);
     });
 
     container.appendChild(frag);
@@ -2180,8 +2054,8 @@ void main() {
 
     updatePlayerFavButton();
 
-    $$('.station-card').forEach((card) => {
-      card.classList.toggle('playing', card.dataset.id === currentStation.id && isPlaying);
+    $$('.station-row').forEach((row) => {
+      row.classList.toggle('playing', row.dataset.id === currentStation.id && isPlaying);
     });
 
     if (isPlaying) {
@@ -2299,27 +2173,6 @@ void main() {
     navigator.mediaSession.setActionHandler('nexttrack', () => playNext());
   }
 
-  // ===== Sidebar =====
-  function setupSidebarBackdrop() {
-    const backdrop = document.createElement('div');
-    backdrop.className = 'sidebar-backdrop';
-    backdrop.id = 'sidebar-backdrop';
-    document.body.appendChild(backdrop);
-
-    backdrop.addEventListener('click', closeSidebar);
-  }
-
-  function toggleSidebar() {
-    sidebar.classList.toggle('open');
-    $('#sidebar-backdrop').classList.toggle('active');
-  }
-
-  function closeSidebar() {
-    sidebar.classList.remove('open');
-    const backdrop = $('#sidebar-backdrop');
-    if (backdrop) backdrop.classList.remove('active');
-  }
-
   // ===== Toast =====
   let toastTimeout;
   function showToast(message) {
@@ -2339,17 +2192,6 @@ void main() {
     }, 2500);
   }
 
-  // ===== Error Display =====
-  function showError(containerId, message) {
-    const container = $(`#${containerId}`);
-    container.classList.remove('loading-placeholder');
-    container.innerHTML = `
-      <div class="empty-state">
-        <p>${escapeHtml(message)}</p>
-        <span>Check your internet connection and try again</span>
-      </div>`;
-  }
-
   // ===== Helpers =====
   function escapeHtml(str) {
     if (!str) return '';
@@ -2363,13 +2205,59 @@ void main() {
     return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  function prefersReducedMotion() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
   // ===== Event Listeners =====
   function setupEventListeners() {
-    $$('.nav-btn').forEach((btn) => {
-      btn.addEventListener('click', () => navigateTo(btn.dataset.view));
+    searchTrigger.addEventListener('click', () => openPalette());
+    btnSurprise.addEventListener('click', surpriseMe);
+    btnFavorites.addEventListener('click', toggleFavoritesPanel);
+    $('#favorites-close').addEventListener('click', closeFavorites);
+    $('#palette-close').addEventListener('click', closePalette);
+    scrim.addEventListener('click', closeOverlay);
+
+    paletteInput.addEventListener('input', (e) => runPalette(e.target.value));
+
+    paletteInput.addEventListener('keydown', (e) => {
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          movePaletteSelection(1);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          movePaletteSelection(-1);
+          break;
+        case 'Enter':
+          e.preventDefault();
+          choosePalette();
+          break;
+        case 'Escape':
+          e.preventDefault();
+          closePalette();
+          break;
+      }
     });
 
-    discoverRefresh.addEventListener('click', () => loadDiscover(true));
+    paletteResults.addEventListener('click', (e) => {
+      const row = e.target.closest('.palette-row');
+      if (row) choosePalette(Number(row.dataset.idx));
+    });
+
+    paletteResults.addEventListener('mousemove', (e) => {
+      const row = e.target.closest('.palette-row');
+      if (!row) return;
+      const idx = Number(row.dataset.idx);
+      if (idx === paletteIndex) return;
+      paletteIndex = idx;
+      paletteResults.querySelectorAll('.palette-row').forEach((el) => {
+        const active = Number(el.dataset.idx) === paletteIndex;
+        el.classList.toggle('active', active);
+        el.setAttribute('aria-selected', String(active));
+      });
+    });
 
     btnPlay.addEventListener('click', togglePlayPause);
     btnPrev.addEventListener('click', playPrev);
@@ -2378,23 +2266,43 @@ void main() {
       if (currentStation) toggleFavorite(currentStation);
     });
 
+    // Find the station you are hearing on the globe.
+    btnLocate.addEventListener('click', () => {
+      if (!currentStation) return;
+      btnLocate.disabled = true;
+      showStationOnGlobe(currentStation)
+        .catch((err) => {
+          console.error('Failed to locate station:', err);
+          showToast('The globe could not be loaded. Please try again.');
+        })
+        .finally(() => {
+          btnLocate.disabled = false;
+        });
+    });
+
     volumeSlider.addEventListener('input', (e) => setVolume(e.target.value));
     btnMute.addEventListener('click', toggleMute);
 
-    searchInput.addEventListener('input', (e) => handleSearch(e.target.value));
-    searchClear.addEventListener('click', () => {
-      searchInput.value = '';
-      handleSearch('');
-      searchInput.focus();
-    });
-
-    sidebarToggle.addEventListener('click', toggleSidebar);
-
     document.addEventListener('keydown', (e) => {
-      if (e.target.tagName === 'INPUT') return;
+      // Ctrl/Cmd+K opens search from anywhere, including from inside a field.
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        if (activeOverlay === 'palette') closePalette();
+        else openPalette();
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        closeOverlay();
+        return;
+      }
+
+      if (e.target.tagName === 'INPUT' || e.target.isContentEditable) return;
 
       switch (e.key) {
         case ' ':
+          // Never steal Space from a focused control: it activates buttons.
+          if (e.target.closest('button')) return;
           e.preventDefault();
           togglePlayPause();
           break;
@@ -2406,12 +2314,12 @@ void main() {
           break;
         case 'ArrowUp':
           e.preventDefault();
-          volumeSlider.value = Math.min(100, parseInt(volumeSlider.value) + 5);
+          volumeSlider.value = Math.min(100, parseInt(volumeSlider.value, 10) + 5);
           setVolume(volumeSlider.value);
           break;
         case 'ArrowDown':
           e.preventDefault();
-          volumeSlider.value = Math.max(0, parseInt(volumeSlider.value) - 5);
+          volumeSlider.value = Math.max(0, parseInt(volumeSlider.value, 10) - 5);
           setVolume(volumeSlider.value);
           break;
         case 'm':
@@ -2419,13 +2327,13 @@ void main() {
           break;
         case '/':
           e.preventDefault();
-          navigateTo('search');
+          openPalette();
+          break;
+        case 's':
+          surpriseMe();
           break;
         case 'f':
           if (currentStation) toggleFavorite(currentStation);
-          break;
-        case 'Escape':
-          closeSidebar();
           break;
       }
     });

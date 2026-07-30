@@ -22,18 +22,17 @@ OpenRadio ships continuously — every push to `main` deploys. See the
 ## Features
 
 - **Thousands of stations in 12,000+ cities** worldwide via the [Radio Garden](https://radio.garden/) API
-- **Discover** — Stations from a rotating selection of featured cities around the globe
-- **Globe** — A Radio Garden-style MapLibre globe with tiled satellite imagery and glowing green dots for every city; spin, zoom, and click a dot to tune in
-- **Search** — Real-time search by station name or place
-- **Browse by Country** — Drill down from country to city to stations
-- **Browse by City** — Every city on the Radio Garden globe, sorted by station count
-- **Favorites** — Save your favorite stations locally (persisted in localStorage)
+- **The globe is the app** — A MapLibre globe with tiled satellite imagery and a glowing green dot for every broadcasting city fills the screen and never goes away; spin, zoom, and click a dot to tune in
+- **One search for everything** — `Ctrl`/`⌘ K` opens a command palette that ranks cities, countries, and stations together, so finding a place and finding a station are the same gesture
+- **Surprise me** — Drops you into a real city somewhere on Earth at random
+- **Station panel** — Choosing a city docks its stations beside the globe while the camera flies there, so you never lose your place
+- **Favorites** — Save stations locally (persisted in localStorage) and reopen them in a sheet over the globe
 - **Full Audio Player** — Play/pause, previous/next, volume, mute, and a three-line waveform that reacts to the live station audio
 - **Media Session Integration** — Controls appear in your OS notification area and lock screen
 - **Keyboard Shortcuts** — Navigate and control playback without touching the mouse
 - **Responsive Design** — Works on desktop, tablet, and mobile, including safe-area support for notched phones
 - **Installable PWA** — Web app manifest with full icon set, so it can be added to your home screen or dock
-- **"Console" Theme** — A broadcast-desk dark UI of floating graphite panels on ruled ink, where lime marks what you can touch and tally amber marks what is on air; Bricolage Grotesque + Inter + JetBrains Mono typography, with animated equalizers on the playing station and in the player dock
+- **"Atlas" Theme** — Glass chrome floating over the globe: lime marks what you can touch, tally amber marks what is on air, and every number is monospace; Bricolage Grotesque + Inter + JetBrains Mono typography
 - **No Build Step** — Plain HTML, CSS, and JavaScript; MapLibre loads from a pinned CDN release
 - **Stream Retry Logic** — Automatic retries when a stream fails to start
 
@@ -75,13 +74,17 @@ Then visit `http://localhost:8000`.
 
 | Key | Action |
 |---|---|
+| `Ctrl`/`⌘` + `K` | Open search — works from anywhere, including inside a field |
+| `/` | Open search |
+| `Esc` | Close search, the favorites sheet, or the station panel |
+| `↑` `↓` `↵` | Move through and pick search results |
 | `Space` | Play / Pause |
 | `←` | Previous station |
 | `→` | Next station |
 | `↑` | Volume up |
 | `↓` | Volume down |
 | `M` | Mute / Unmute |
-| `/` | Jump to search |
+| `S` | Surprise me — tune in somewhere at random |
 | `F` | Toggle favorite |
 
 ## Project Structure

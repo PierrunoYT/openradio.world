@@ -6,6 +6,39 @@ commit order rather than by version number. Newest change first.
 
 ---
 
+## 2026-07-30 (later)
+
+- **Redesigned the app around the globe — "Atlas"** — The six-view sidebar IA
+  (Discover, Globe, Search, Favorites, By Country, By City) is gone. The globe
+  is no longer one view among six: it is the app, a canvas that fills the
+  viewport and never unmounts. Everything else floats over it as glass — a
+  brand plate, one search field, a station panel that docks to the edge, and a
+  player dock that only appears once something is on air.
+
+- **One search replaces three views** — `Ctrl`/`⌘ K` (or `/`) opens a command
+  palette that ranks cities, countries, and stations in a single list, so
+  finding a place and finding a station are the same gesture. Places answer
+  instantly from memory while stations stream in underneath. This retires the
+  Search view, the 200-chip country wall, and the 12,000-chip city wall, along
+  with the globe's separate inline place lookup.
+
+- **Discover became "Surprise me"** — Instead of three lists of cards, one
+  button (or `S`) drops the listener into a real city somewhere on Earth and
+  flies the camera there. The palette's idle state still offers somewhere to
+  go, mixing featured places with your favorites.
+
+- **Favorites open as a sheet over the globe**, and the player dock gained a
+  locate button that flies the globe to whatever is currently on air.
+
+- **Station rows are keyboard-operable** — Each row's play target is a real
+  `<button>` rather than a click-handled `<div>`, and the global Space shortcut
+  no longer swallows activation of a focused control.
+
+- **Attribution and legal links moved into the globe's info popover** now that
+  there is no sidebar to hold them; the popover stays available on mobile.
+
+---
+
 ## 2026-07-30
 
 - **Rebuilt the interface design from scratch — "Console"** — `style.css` and
