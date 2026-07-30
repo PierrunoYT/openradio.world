@@ -37,6 +37,17 @@ commit order rather than by version number. Newest change first.
 - **Attribution and legal links moved into the globe's info popover** now that
   there is no sidebar to hold them; the popover stays available on mobile.
 
+- **Redrew the social preview card** — The old card advertised a screen that no
+  longer exists: it carried the retired Discover headline ("Find your new
+  favorite frequency."), the deleted hero's orbit artwork, the previous
+  ink-navy palette, and the retired teal accent — while its own caption now
+  promises a globe. The new card shows that globe, drawn from the real
+  directory: every dot is a broadcasting city from `data/places.json`,
+  orthographically projected the same way the app projects them. Typography
+  matches the app (Bricolage Grotesque, Inter, JetBrains Mono), the alt text
+  now describes the image, and `?v=atlas-1` refreshes the scrapers' caches.
+  The PNG came out smaller than the card it replaces.
+
 ---
 
 ## 2026-07-30
