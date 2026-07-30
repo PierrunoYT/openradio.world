@@ -79,7 +79,8 @@
 
     // Show the shortcut the way this platform writes it.
     if (/Mac|iPhone|iPad/.test(navigator.platform || '')) {
-      $('#search-trigger-key').textContent = '⌘K';
+      const searchTriggerKey = $('#search-trigger-key');
+      if (searchTriggerKey) searchTriggerKey.textContent = '⌘K';
     }
 
     // The globe is the app, not a view you navigate to: build it immediately.
@@ -2211,77 +2212,91 @@ void main() {
 
   // ===== Event Listeners =====
   function setupEventListeners() {
-    searchTrigger.addEventListener('click', () => openPalette());
-    btnSurprise.addEventListener('click', surpriseMe);
-    btnFavorites.addEventListener('click', toggleFavoritesPanel);
-    $('#favorites-close').addEventListener('click', closeFavorites);
-    $('#palette-close').addEventListener('click', closePalette);
-    scrim.addEventListener('click', closeOverlay);
+    // Elements are null-checked before wiring: a browser holding a cached
+    // index.html can load the newest app.js and be missing whatever markup
+    // is newest, and one unguarded lookup here would abort the whole
+    // function, leaving playback, volume, and keyboard shortcuts unwired.
+    if (searchTrigger) searchTrigger.addEventListener('click', () => openPalette());
+    if (btnSurprise) btnSurprise.addEventListener('click', surpriseMe);
+    if (btnFavorites) btnFavorites.addEventListener('click', toggleFavoritesPanel);
+    const favoritesCloseBtn = $('#favorites-close');
+    if (favoritesCloseBtn) favoritesCloseBtn.addEventListener('click', closeFavorites);
+    const paletteCloseBtn = $('#palette-close');
+    if (paletteCloseBtn) paletteCloseBtn.addEventListener('click', closePalette);
+    if (scrim) scrim.addEventListener('click', closeOverlay);
 
-    paletteInput.addEventListener('input', (e) => runPalette(e.target.value));
+    if (paletteInput) {
+      paletteInput.addEventListener('input', (e) => runPalette(e.target.value));
 
-    paletteInput.addEventListener('keydown', (e) => {
-      switch (e.key) {
-        case 'ArrowDown':
-          e.preventDefault();
-          movePaletteSelection(1);
-          break;
-        case 'ArrowUp':
-          e.preventDefault();
-          movePaletteSelection(-1);
-          break;
-        case 'Enter':
-          e.preventDefault();
-          choosePalette();
-          break;
-        case 'Escape':
-          e.preventDefault();
-          closePalette();
-          break;
-      }
-    });
-
-    paletteResults.addEventListener('click', (e) => {
-      const row = e.target.closest('.palette-row');
-      if (row) choosePalette(Number(row.dataset.idx));
-    });
-
-    paletteResults.addEventListener('mousemove', (e) => {
-      const row = e.target.closest('.palette-row');
-      if (!row) return;
-      const idx = Number(row.dataset.idx);
-      if (idx === paletteIndex) return;
-      paletteIndex = idx;
-      paletteResults.querySelectorAll('.palette-row').forEach((el) => {
-        const active = Number(el.dataset.idx) === paletteIndex;
-        el.classList.toggle('active', active);
-        el.setAttribute('aria-selected', String(active));
+      paletteInput.addEventListener('keydown', (e) => {
+        switch (e.key) {
+          case 'ArrowDown':
+            e.preventDefault();
+            movePaletteSelection(1);
+            break;
+          case 'ArrowUp':
+            e.preventDefault();
+            movePaletteSelection(-1);
+            break;
+          case 'Enter':
+            e.preventDefault();
+            choosePalette();
+            break;
+          case 'Escape':
+            e.preventDefault();
+            closePalette();
+            break;
+        }
       });
-    });
+    }
 
-    btnPlay.addEventListener('click', togglePlayPause);
-    btnPrev.addEventListener('click', playPrev);
-    btnNext.addEventListener('click', playNext);
-    btnFavPlayer.addEventListener('click', () => {
-      if (currentStation) toggleFavorite(currentStation);
-    });
+    if (paletteResults) {
+      paletteResults.addEventListener('click', (e) => {
+        const row = e.target.closest('.palette-row');
+        if (row) choosePalette(Number(row.dataset.idx));
+      });
+
+      paletteResults.addEventListener('mousemove', (e) => {
+        const row = e.target.closest('.palette-row');
+        if (!row) return;
+        const idx = Number(row.dataset.idx);
+        if (idx === paletteIndex) return;
+        paletteIndex = idx;
+        paletteResults.querySelectorAll('.palette-row').forEach((el) => {
+          const active = Number(el.dataset.idx) === paletteIndex;
+          el.classList.toggle('active', active);
+          el.setAttribute('aria-selected', String(active));
+        });
+      });
+    }
+
+    if (btnPlay) btnPlay.addEventListener('click', togglePlayPause);
+    if (btnPrev) btnPrev.addEventListener('click', playPrev);
+    if (btnNext) btnNext.addEventListener('click', playNext);
+    if (btnFavPlayer) {
+      btnFavPlayer.addEventListener('click', () => {
+        if (currentStation) toggleFavorite(currentStation);
+      });
+    }
 
     // Find the station you are hearing on the globe.
-    btnLocate.addEventListener('click', () => {
-      if (!currentStation) return;
-      btnLocate.disabled = true;
-      showStationOnGlobe(currentStation)
-        .catch((err) => {
-          console.error('Failed to locate station:', err);
-          showToast('The globe could not be loaded. Please try again.');
-        })
-        .finally(() => {
-          btnLocate.disabled = false;
-        });
-    });
+    if (btnLocate) {
+      btnLocate.addEventListener('click', () => {
+        if (!currentStation) return;
+        btnLocate.disabled = true;
+        showStationOnGlobe(currentStation)
+          .catch((err) => {
+            console.error('Failed to locate station:', err);
+            showToast('The globe could not be loaded. Please try again.');
+          })
+          .finally(() => {
+            btnLocate.disabled = false;
+          });
+      });
+    }
 
-    volumeSlider.addEventListener('input', (e) => setVolume(e.target.value));
-    btnMute.addEventListener('click', toggleMute);
+    if (volumeSlider) volumeSlider.addEventListener('input', (e) => setVolume(e.target.value));
+    if (btnMute) btnMute.addEventListener('click', toggleMute);
 
     document.addEventListener('keydown', (e) => {
       // Ctrl/Cmd+K opens search from anywhere, including from inside a field.
@@ -2314,13 +2329,17 @@ void main() {
           break;
         case 'ArrowUp':
           e.preventDefault();
-          volumeSlider.value = Math.min(100, parseInt(volumeSlider.value, 10) + 5);
-          setVolume(volumeSlider.value);
+          if (volumeSlider) {
+            volumeSlider.value = Math.min(100, parseInt(volumeSlider.value, 10) + 5);
+            setVolume(volumeSlider.value);
+          }
           break;
         case 'ArrowDown':
           e.preventDefault();
-          volumeSlider.value = Math.max(0, parseInt(volumeSlider.value, 10) - 5);
-          setVolume(volumeSlider.value);
+          if (volumeSlider) {
+            volumeSlider.value = Math.max(0, parseInt(volumeSlider.value, 10) - 5);
+            setVolume(volumeSlider.value);
+          }
           break;
         case 'm':
           toggleMute();

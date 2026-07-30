@@ -6,6 +6,24 @@ commit order rather than by version number. Newest change first.
 
 ---
 
+## 2026-07-30 (yet even later still)
+
+- **Guarded the newest DOM lookups in `setupEventListeners()` and `init()`**
+  — every element the globe redesign added (`#search-trigger`,
+  `#btn-surprise`, `#btn-favorites`, `#palette`, `#palette-input`,
+  `#palette-results`, `#scrim`, `#btn-locate`, `#search-trigger-key`, the
+  favorites/palette close buttons) was wired up without a null check, unlike
+  the rest of this codebase's documented pattern for exactly this situation.
+  The site shipped three markup rewrites in one week (sidebar → console →
+  atlas); a returning visitor with any of those cached would load the newest
+  `app.js` against old markup, hit `null.addEventListener` on the first
+  missing element, and have `init()` abort before the player's play/pause,
+  volume, mute, and keyboard shortcuts ever got wired up — not just the new
+  feature breaking, the whole player going dead. Reproduced against a
+  stripped-down copy of `index.html` (confirmed it threw
+  `Cannot read properties of null (reading 'addEventListener')` on the
+  previous `app.js`) and confirmed the guarded version loads clean.
+
 ## 2026-07-30 (yet even later)
 
 - **Fixed country searches hiding most of their places** — The command
