@@ -9,20 +9,21 @@ commit order rather than by version number. Newest change first.
 ## 2026-07-30 (yet even later still)
 
 - **Guarded the newest DOM lookups in `setupEventListeners()` and `init()`**
-  — every element the globe redesign added (`#search-trigger`,
-  `#btn-surprise`, `#btn-favorites`, `#palette`, `#palette-input`,
-  `#palette-results`, `#scrim`, `#btn-locate`, `#search-trigger-key`, the
-  favorites/palette close buttons) was wired up without a null check, unlike
-  the rest of this codebase's documented pattern for exactly this situation.
-  The site shipped three markup rewrites in one week (sidebar → console →
-  atlas); a returning visitor with any of those cached would load the newest
-  `app.js` against old markup, hit `null.addEventListener` on the first
-  missing element, and have `init()` abort before the player's play/pause,
-  volume, mute, and keyboard shortcuts ever got wired up — not just the new
-  feature breaking, the whole player going dead. Reproduced against a
-  stripped-down copy of `index.html` (confirmed it threw
-  `Cannot read properties of null (reading 'addEventListener')` on the
-  previous `app.js`) and confirmed the guarded version loads clean.
+  — every element the globe redesign (`292a8c2`, earlier the same day) added
+  to replace the old sidebar markup (`#search-trigger`, `#btn-surprise`,
+  `#btn-favorites`, `#palette`, `#palette-input`, `#palette-results`,
+  `#scrim`, `#btn-locate`, `#search-trigger-key`, the favorites/palette close
+  buttons) was wired up without a null check, unlike the rest of this
+  codebase's documented pattern for exactly this situation. A returning
+  visitor with any older `index.html` cached — from that redesign's own
+  same-day CSS-only reskin, which left every id untouched, or from further
+  back — would load the newest `app.js` against markup missing those ids,
+  hit `null.addEventListener` on the first one, and have `init()` abort
+  before the player's play/pause, volume, mute, and keyboard shortcuts ever
+  got wired up: not just the new feature breaking, the whole player going
+  dead. Reproduced against a stripped-down copy of `index.html` (confirmed
+  it threw `Cannot read properties of null (reading 'addEventListener')` on
+  the previous `app.js`) and confirmed the guarded version loads clean.
 
 ## 2026-07-30 (yet even later)
 
@@ -121,11 +122,15 @@ commit order rather than by version number. Newest change first.
 ## 2026-07-27
 
 - **Hardened the stream proxy and script loading** — `functions/listen.js`'s
-  redirect-following mode (`redirect: 'follow'`) trusted wherever a station's
-  upstream redirected to; it now follows redirects manually, capped at 5 hops,
-  validating each hop's host against the same allowlist as direct requests, so
-  a compromised or malicious upstream can't redirect the proxy into fetching
-  an arbitrary URL. Proxied responses also get a locked-down
+  `?url=` mode (proxying a direct stream URL from the snapshot) used
+  `redirect: 'follow'`, trusting wherever that already-allowlisted host's
+  redirect chain led; it now follows redirects manually, capped at 5 hops,
+  validating every hop's host against the same allowlist as the initial
+  request, so a compromised or malicious upstream can't redirect the proxy
+  into fetching an arbitrary URL. (The `?id=` mode, which always targets
+  Radio Garden's own `listen` endpoint rather than a third-party host, still
+  follows redirects directly — it wasn't part of this change.) Proxied
+  responses also get a locked-down
   `Content-Security-Policy: sandbox; default-src 'none'` and
   `X-Content-Type-Options: nosniff`, and no longer forward the upstream's
   claimed `Content-Type` verbatim. The MapLibre GL script and stylesheet
