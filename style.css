@@ -424,12 +424,16 @@ body:has(#player-bar:not(.hidden)) #globe-hint,
 #globe-zoom {
   position: absolute;
   right: var(--edge);
-  bottom: var(--edge);
+  /* Leaves room for the player dock, which would otherwise cover these
+     buttons whenever a station is playing. */
+  bottom: calc(var(--edge) + var(--player-height) + 8px);
   z-index: 10;
   display: flex;
   flex-direction: column;
   gap: 7px;
 }
+
+body:has(#player-bar.hidden) #globe-zoom { bottom: var(--edge); }
 
 #globe-zoom button {
   width: 36px;
@@ -442,7 +446,10 @@ body:has(#player-bar:not(.hidden)) #globe-hint,
 #globe-info-btn {
   position: absolute;
   left: var(--edge);
-  bottom: var(--edge);
+  /* Same reasoning as #globe-zoom: the player dock sits on top of this
+     spot once a station is playing, hiding the legal and open-source
+     links that live in the panel it opens. */
+  bottom: calc(var(--edge) + var(--player-height) + 8px);
   z-index: 10;
   width: 32px;
   height: 32px;
@@ -451,6 +458,8 @@ body:has(#player-bar:not(.hidden)) #globe-hint,
   font-size: 0.88rem;
   font-weight: 700;
 }
+
+body:has(#player-bar.hidden) #globe-info-btn { bottom: var(--edge); }
 
 #globe-info-btn[aria-expanded="true"] {
   border-color: var(--lime-glow);
@@ -461,7 +470,7 @@ body:has(#player-bar:not(.hidden)) #globe-hint,
 #globe-info-panel {
   position: absolute;
   left: var(--edge);
-  bottom: calc(var(--edge) + 44px);
+  bottom: calc(var(--edge) + var(--player-height) + 8px + 44px);
   z-index: 12;
   width: min(300px, calc(100% - 2 * var(--edge)));
   padding: 18px;
@@ -472,6 +481,8 @@ body:has(#player-bar:not(.hidden)) #globe-hint,
   -webkit-backdrop-filter: var(--blur);
   box-shadow: var(--shadow-pop);
 }
+
+body:has(#player-bar.hidden) #globe-info-panel { bottom: calc(var(--edge) + 44px); }
 
 #globe-info-panel h3 {
   font-family: var(--font-display);

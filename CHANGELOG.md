@@ -6,6 +6,20 @@ commit order rather than by version number. Newest change first.
 
 ---
 
+## 2026-07-30 (even later)
+
+- **Fixed the legal links, GitHub link, and Radio Garden attribution being
+  unreachable while a station plays** — The "About this globe" button and its
+  panel (home to the Privacy/Terms/Disclaimer links, the "Open source on
+  GitHub" link, and the Radio Garden attribution) sat at the same bottom-left
+  corner as the player dock. The player dock is `z-index: 30` with a solid
+  background and appears the moment any station plays, so it fully covered
+  the button — meaning those links were unreachable for as long as anyone was
+  actually listening. `#globe-info-btn`, `#globe-info-panel`, and
+  `#globe-zoom` now leave room for `var(--player-height)` by default and
+  collapse back down via `body:has(#player-bar.hidden)`, the same pattern
+  already used for the favorites sheet.
+
 ## 2026-07-30 (later)
 
 - **Redesigned the app around the globe — "Atlas"** — The six-view sidebar IA
