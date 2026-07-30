@@ -6,6 +6,16 @@ commit order rather than by version number. Newest change first.
 
 ---
 
+## 2026-07-30 (yet even later)
+
+- **Fixed country searches hiding most of their places** — The command
+  palette capped place matches at 7 (`PALETTE_PLACE_LIMIT`), so searching a
+  country name only ever showed its 7 biggest places by station count.
+  Searching "switzerland" showed Zug, Zürich, Lausanne, Geneva, Bern, Basel,
+  and Sion — Lucerne and the other 65 Swiss places never rendered, even
+  though searching "lucerne" directly found it fine. `#palette-results` was
+  already scrollable, so the cap wasn't buying anything; raised it to 25.
+
 ## 2026-07-30 (even later)
 
 - **Fixed the legal links, GitHub link, and Radio Garden attribution being

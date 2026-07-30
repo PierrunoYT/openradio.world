@@ -315,7 +315,7 @@
   // ===== Command Palette =====
   // One field resolves everything the old Search / By Country / By City views
   // used to: cities, countries, and stations, ranked together.
-  const PALETTE_PLACE_LIMIT = 7;
+  const PALETTE_PLACE_LIMIT = 25;
   const PALETTE_STATION_LIMIT = 6;
   const PALETTE_SUGGESTIONS = 6;
 
