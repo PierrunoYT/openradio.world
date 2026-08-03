@@ -1117,8 +1117,11 @@
       // injected shader prelude (projectTileFor3D) places them on the globe
       // or mercator plane, including the projection transition, and clips
       // the back hemisphere. A second on-demand pass renders each dot's id
-      // as a color into an offscreen buffer, so hover/click picking is
-      // pixel-exact.
+      // as a color into an offscreen buffer. Touch devices get a larger
+      // invisible target while the visible dots stay compact.
+      const POINTER_PICK_RADIUS = 6.5;
+      const TOUCH_PICK_RADIUS = 20;
+
       function createMarkerLayer() {
         const quadTemplate = [-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1];
 
@@ -1273,7 +1276,7 @@ void main() {
             return this.dotVao;
           },
 
-          drawScene(gl, programEntry, args, pickMode, viewportWidth, viewportHeight) {
+          drawScene(gl, programEntry, args, pickMode, viewportWidth, viewportHeight, pickRadius = POINTER_PICK_RADIUS) {
             const projection = args.defaultProjectionData;
             const uniforms = programEntry.uniforms;
             const canvas = this.map.getCanvas();
@@ -1286,7 +1289,7 @@ void main() {
             gl.uniform1f(uniforms.u_projection_transition, projection.projectionTransition);
             gl.uniform1f(uniforms.u_pick_mode, pickMode);
             gl.uniform2f(uniforms.u_viewport, viewportWidth, viewportHeight);
-            gl.uniform1f(uniforms.u_dot_radius, (pickMode ? 6.5 : 5) * pixelScale);
+            gl.uniform1f(uniforms.u_dot_radius, (pickMode ? pickRadius : 5) * pixelScale);
             gl.uniform3f(uniforms.u_selected_pick, ...this.selectedPick);
             if (pickMode) {
               gl.disable(gl.BLEND);
@@ -1338,7 +1341,7 @@ void main() {
             gl.viewport(0, 0, this.pickWidth, this.pickHeight);
             gl.clearColor(0, 0, 0, 0);
             gl.clear(gl.COLOR_BUFFER_BIT);
-            this.drawScene(gl, entry, args, 1, this.pickWidth, this.pickHeight);
+            this.drawScene(gl, entry, args, 1, this.pickWidth, this.pickHeight, pick.radius);
             const pixelX = Math.min(
               this.pickWidth - 1,
               Math.max(0, Math.round(pick.point.x * scaleX / PICK_DOWNSCALE)),
@@ -1374,12 +1377,13 @@ void main() {
             if (this.pendingPick) this.resolvePick(gl, entry, args);
           },
 
-          pick(point, callback) {
+          pick(point, callback, radius = POINTER_PICK_RADIUS) {
             if (this.pendingPick) {
               this.pendingPick.point = point;
+              this.pendingPick.radius = Math.max(this.pendingPick.radius, radius);
               this.pendingPick.callbacks.push(callback);
             } else {
-              this.pendingPick = { point, callbacks: [callback] };
+              this.pendingPick = { point, radius, callbacks: [callback] };
             }
             if (this.map) this.map.triggerRepaint();
           },
@@ -1563,10 +1567,13 @@ void main() {
       openGlobePlace = openPlaceStations;
 
       map.on('click', (event) => {
+        const pickRadius = window.matchMedia('(pointer: coarse)').matches
+          ? TOUCH_PICK_RADIUS
+          : POINTER_PICK_RADIUS;
         markerLayer.pick(event.point, (place) => {
           if (!place) return;
           openPlaceStations(place);
-        });
+        }, pickRadius);
       });
 
       await Promise.race([
