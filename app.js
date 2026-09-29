@@ -1309,7 +1309,11 @@ void main() {
   }
 
   function saveFavorites() {
-    localStorage.setItem(FAV_KEY, JSON.stringify(favorites));
+    try {
+      localStorage.setItem(FAV_KEY, JSON.stringify(favorites));
+    } catch {
+      showToast('Could not save favorites on this device.');
+    }
     updateFavCount();
   }
 

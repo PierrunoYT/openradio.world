@@ -8,6 +8,12 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-09-29
 
+- **Favorites no longer break when storage is unavailable** — `saveFavorites()`
+  called `localStorage.setItem` unguarded, so blocked storage or a full quota
+  threw in the middle of `toggleFavorite()`, after the in-memory change but
+  before the heart buttons and badge updated. It now catches the error and
+  shows a toast, and the UI stays consistent for the session.
+
 - **Removed the dead globe.gl globe implementation** — `loadGlobe()` and its
   helpers (~430 lines) were left over from before the MapLibre globe: nothing
   called them, they loaded a `lib/globe.gl.min.js` that no longer exists, and
