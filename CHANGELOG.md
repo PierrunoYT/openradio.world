@@ -8,6 +8,13 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-09-29
 
+- **Made saved-volume loading crash-proof** — `loadVolume()` read
+  `localStorage` unguarded and trusted whatever it found, so blocked storage
+  threw during `init()` and a malformed or out-of-range value produced `NaN`
+  or an invalid `audio.volume`. It now catches storage errors, falls back to
+  80 for non-numeric values, and clamps to 0-100; `setVolume()` no longer
+  throws when storage is unavailable.
+
 - **Fixed playback races between stations** — the 100 ms reset timer and the
   retry timers in `attemptPlay()` and the audio `error` handler were never
   cancelled or tied to a station, so picking station B while A had a pending

@@ -2148,8 +2148,12 @@ void main() {
 
   // ===== Volume =====
   function loadVolume() {
-    const saved = localStorage.getItem(VOL_KEY);
-    const vol = saved ? parseInt(saved, 10) : 80;
+    let saved = null;
+    try {
+      saved = localStorage.getItem(VOL_KEY);
+    } catch {}
+    const parsed = saved ? parseInt(saved, 10) : NaN;
+    const vol = Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : 80;
     volumeSlider.value = vol;
     audio.volume = vol / 100;
     volumeSlider.style.setProperty('--volume-level', `${vol}%`);
@@ -2157,7 +2161,9 @@ void main() {
 
   function setVolume(val) {
     audio.volume = val / 100;
-    localStorage.setItem(VOL_KEY, val);
+    try {
+      localStorage.setItem(VOL_KEY, val);
+    } catch {}
     volumeSlider.style.setProperty('--volume-level', `${val}%`);
     updateVolumeIcon();
   }
