@@ -1894,6 +1894,10 @@ void main() {
   // ===== Audio Player =====
   let retryCount = 0;
   let triedSnapshotStream = false;
+  // Bumped on every station change so pending timers/retries from a previous
+  // station can tell they are stale and bail out.
+  let playGeneration = 0;
+  let playTimer = 0;
   const MAX_RETRIES = 2;
   let waveAnimationFrame = 0;
   const waveContext = playerWave ? playerWave.getContext('2d') : null;
@@ -1971,6 +1975,8 @@ void main() {
 
   function playStation(station) {
     currentStation = station;
+    playGeneration++;
+    clearTimeout(playTimer);
     isLoading = true;
     isPlaying = false;
     retryCount = 0;
@@ -1989,24 +1995,30 @@ void main() {
   }
 
   function attemptPlay(url) {
+    const generation = playGeneration;
+    clearTimeout(playTimer);
     audio.pause();
     audio.removeAttribute('src');
     audio.load();
 
     // Small delay to let the audio element reset
-    setTimeout(() => {
+    playTimer = setTimeout(() => {
+      if (generation !== playGeneration) return;
       audio.src = url;
       audio.load();
 
       const playPromise = audio.play();
       if (playPromise !== undefined) {
         playPromise.catch((err) => {
+          if (generation !== playGeneration) return;
           console.warn('Playback attempt failed:', err.message);
 
           if (retryCount < MAX_RETRIES && currentStation) {
             retryCount++;
             console.log(`Retrying playback (${retryCount}/${MAX_RETRIES})...`);
-            setTimeout(() => attemptPlay(url), 500 * retryCount);
+            playTimer = setTimeout(() => {
+              if (generation === playGeneration) attemptPlay(url);
+            }, 500 * retryCount);
           } else {
             isLoading = false;
             isPlaying = false;
@@ -2097,10 +2109,14 @@ void main() {
   audio.addEventListener('error', async () => {
     if (!currentStation) return;
 
+    const generation = playGeneration;
     if (retryCount < MAX_RETRIES) {
       retryCount++;
       console.log(`Stream error, retrying (${retryCount}/${MAX_RETRIES})...`);
-      setTimeout(() => attemptPlay(streamUrl(currentStation)), 500 * retryCount);
+      clearTimeout(playTimer);
+      playTimer = setTimeout(() => {
+        if (generation === playGeneration) attemptPlay(streamUrl(currentStation));
+      }, 500 * retryCount);
       return;
     }
 
@@ -2110,6 +2126,7 @@ void main() {
       triedSnapshotStream = true;
       try {
         const snap = await loadSnapshot();
+        if (generation !== playGeneration) return;
         const saved = snap.stations.find((s) => s.id === currentStation.id);
         if (saved && saved.streamUrl) {
           console.log('Falling back to snapshot stream URL...');

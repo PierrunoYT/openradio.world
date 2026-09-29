@@ -6,6 +6,16 @@ commit order rather than by version number. Newest change first.
 
 ---
 
+## 2026-09-29
+
+- **Fixed playback races between stations** — the 100 ms reset timer and the
+  retry timers in `attemptPlay()` and the audio `error` handler were never
+  cancelled or tied to a station, so picking station B while A had a pending
+  attempt could let A's URL overwrite the audio source while the UI still
+  showed B. Each station change now bumps a generation counter and clears the
+  pending timer; stale timers, rejected `play()` promises, and the snapshot
+  fallback all bail out when the generation has moved on.
+
 ## 2026-07-30 (yet even later still)
 
 - **Guarded the newest DOM lookups in `setupEventListeners()` and `init()`**
