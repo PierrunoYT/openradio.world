@@ -8,6 +8,13 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-09-29
 
+- **Fixed HTTPS snapshot streams failing in production** — `proxiedStreamUrl()`
+  sent every snapshot stream through `/listen?url=`, but the proxy's allowlist
+  (`data/stream-hosts.json`) only contains http hosts, so all ~34,000 https
+  streams got a 403 and the snapshot fallback never worked for them. Only
+  `http://` URLs are proxied now (they need it for mixed content); https
+  streams play directly.
+
 - **Globe initialisation failures are no longer permanent** — only the early
   dependency-load failure reset `mapLibreGlobePromise`; an error while
   creating or loading the map left a rejected promise cached, so every later

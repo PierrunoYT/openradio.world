@@ -200,11 +200,11 @@
     };
   }
 
-  // Production audio stays same-origin through the restricted streaming proxy.
-  // Besides handling mixed content, this lets Web Audio analyse the stream
-  // without requiring every third-party station host to provide CORS headers.
+  // Plain-http streams go through the restricted streaming proxy in production
+  // because browsers block them as mixed content. https streams play directly:
+  // the proxy's allowlist only covers http hosts, so proxying them would 403.
   function proxiedStreamUrl(url) {
-    if (LIVE_API_ENABLED) {
+    if (LIVE_API_ENABLED && /^http:\/\//i.test(url)) {
       return `/listen?url=${encodeURIComponent(url)}`;
     }
     return url;
