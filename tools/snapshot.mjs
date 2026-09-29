@@ -9,7 +9,9 @@
 //                          website, secure, streamUrl }
 //
 // The crawl is resumable: progress is checkpointed to data/.snapshot-progress.json
-// after every batch, so rerunning the script continues where it left off.
+// after every batch, so rerunning an interrupted run continues where it left off.
+// A run that completes cleanly resets the checkpoint, so the next run is a full
+// refresh.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -117,6 +119,7 @@ async function main() {
   const todo = places.filter((p) => !donePlaces.has(p.id));
   console.log(`${todo.length} places to crawl (${donePlaces.size} already done)`);
   let crawled = 0;
+  let failedPlaces = 0;
 
   await pool(todo, async (place) => {
     try {
@@ -140,6 +143,7 @@ async function main() {
       });
       donePlaces.add(place.id);
     } catch (err) {
+      failedPlaces++;
       console.log(`  FAILED place ${place.title}: ${err.message}`);
     }
     crawled++;
@@ -183,6 +187,16 @@ async function main() {
     } catch {}
   }
   writeFileSync(join(DATA_DIR, 'stream-hosts.json'), JSON.stringify([...httpHosts].sort(), null, 2) + '\n');
+
+  // The crawl finished cleanly: clear the checkpoint so the next run starts
+  // from scratch and picks up added, removed and changed stations. The
+  // checkpoint only survives an interrupted or partly failed run.
+  if (failedPlaces === 0) {
+    saveProgress({ donePlaces: [], stations: {} });
+    console.log('Crawl complete; checkpoint reset for the next fresh run.');
+  } else {
+    saveProgress(progress);
+  }
 
   console.log('=== Done ===');
   console.log(`${all.length} stations (${withStream} with resolved stream URLs) -> data/stations.json`);

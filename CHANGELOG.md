@@ -8,6 +8,13 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-09-29
 
+- **Snapshot refreshes no longer stay stale forever** — `tools/snapshot.mjs`
+  skipped every place recorded in `.snapshot-progress.json` and kept existing
+  stream URLs, so a rerun after a finished crawl discovered nothing new and
+  never dropped deleted stations. A run that finishes with no failed places
+  now resets the checkpoint, so the next run is a full refresh; the checkpoint
+  only persists across interrupted or partly failed runs, as designed.
+
 - **Fixed HTTPS snapshot streams failing in production** — `proxiedStreamUrl()`
   sent every snapshot stream through `/listen?url=`, but the proxy's allowlist
   (`data/stream-hosts.json`) only contains http hosts, so all ~34,000 https
