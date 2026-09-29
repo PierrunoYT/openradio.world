@@ -8,6 +8,11 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-09-29
 
+- **Corrected the README's "just open index.html" instructions** — opening the
+  page from `file://` cannot fetch the local `data/` snapshot, so the app
+  doesn't work that way. The Getting Started section now says to serve it
+  with a static file server.
+
 - **Favorites no longer break when storage is unavailable** — `saveFavorites()`
   called `localStorage.setItem` unguarded, so blocked storage or a full quota
   threw in the middle of `toggleFavorite()`, after the in-memory change but

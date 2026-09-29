@@ -38,24 +38,10 @@ OpenRadio ships continuously — every push to `main` deploys. See the
 
 ## Getting Started
 
-### Option 1: Just Open It
+### Serve It Locally
 
-1. Download or clone this repository
-2. Open `index.html` in any modern browser
-3. Start listening
-
-```bash
-git clone https://github.com/PierrunoYT/openradio.world.git
-cd openradio.world
-# Open index.html in your browser
-start index.html        # Windows
-open index.html         # macOS
-xdg-open index.html     # Linux
-```
-
-### Option 2: Serve It Locally
-
-Use any static file server:
+Opening `index.html` straight from disk (`file://`) does not work: browsers
+block the local `data/` snapshot fetches. Use any static file server:
 
 ```bash
 # Python
