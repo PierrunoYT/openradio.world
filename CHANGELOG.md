@@ -8,6 +8,10 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-09-29
 
+- **Privacy policy now discloses third-party asset requests** — the page loads
+  Google Fonts, MapLibre from jsDelivr, and Esri satellite imagery, none of
+  which the policy mentioned. Added a "Third-party assets" section.
+
 - **Snapshot refreshes no longer stay stale forever** — `tools/snapshot.mjs`
   skipped every place recorded in `.snapshot-progress.json` and kept existing
   stream URLs, so a rerun after a finished crawl discovered nothing new and
