@@ -8,6 +8,13 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-09-29
 
+- **Globe initialisation failures are no longer permanent** — only the early
+  dependency-load failure reset `mapLibreGlobePromise`; an error while
+  creating or loading the map left a rejected promise cached, so every later
+  call (locate, place picks) failed until a page reload. The whole init is now
+  wrapped so any failure clears the cached promise and the loading state,
+  letting the next attempt retry.
+
 - **Made saved-volume loading crash-proof** — `loadVolume()` read
   `localStorage` unguarded and trusted whatever it found, so blocked storage
   threw during `init()` and a malformed or out-of-range value produced `NaN`

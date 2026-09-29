@@ -1610,7 +1610,13 @@ void main() {
       refreshGlobeMarkers = () => map.triggerRepaint();
       if (currentView === 'globe') rotateFrame = requestAnimationFrame(rotate);
       else window.__globe.pauseAnimation();
-    })();
+    })().catch((err) => {
+      // Let a later call retry instead of reusing a rejected promise forever
+      mapLibreGlobePromise = null;
+      const wrap = $('#globe-wrap');
+      if (wrap) wrap.classList.remove('is-loading');
+      throw err;
+    });
     return mapLibreGlobePromise;
   }
 
