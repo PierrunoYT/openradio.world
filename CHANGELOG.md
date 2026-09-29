@@ -8,6 +8,13 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-09-29
 
+- **Removed the dead globe.gl globe implementation** — `loadGlobe()` and its
+  helpers (~430 lines) were left over from before the MapLibre globe: nothing
+  called them, they loaded a `lib/globe.gl.min.js` that no longer exists, and
+  they targeted a `#globe-points` canvas that is no longer in `index.html`.
+  Every visitor was downloading and parsing them for nothing. The MapLibre
+  globe is untouched.
+
 - **Fixed CSP blocking directly-played HTTPS streams** — the earlier change to
   play https streams directly (instead of via `/listen`) was still blocked in
   production because `_headers` set `media-src 'self'`, so every https station
