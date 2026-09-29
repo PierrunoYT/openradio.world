@@ -8,6 +8,12 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-09-29
 
+- **Fixed CSP blocking directly-played HTTPS streams** — the earlier change to
+  play https streams directly (instead of via `/listen`) was still blocked in
+  production because `_headers` set `media-src 'self'`, so every https station
+  would have failed to load. `media-src` now allows `https:`; plain-http
+  streams still go through the same-origin proxy.
+
 - **Privacy policy now discloses third-party asset requests** — the page loads
   Google Fonts, MapLibre from jsDelivr, and Esri satellite imagery, none of
   which the policy mentioned. Added a "Third-party assets" section.
