@@ -76,6 +76,7 @@
     loadFavorites();
     loadVolume();
     setupEventListeners();
+    restoreLastStation();
 
     // Show the shortcut the way this platform writes it.
     if (/Mac|iPhone|iPad/.test(navigator.platform || '')) {
@@ -84,7 +85,7 @@
     }
 
     // The globe is the app, not a view you navigate to: build it immediately.
-    loadMapLibreGlobe();
+    loadMapLibreGlobe().catch(() => {});
   }
 
   // ===== API Helpers =====
@@ -284,6 +285,19 @@
   const currentView = 'globe';
 
   let activeOverlay = null; // 'palette' | 'favorites' | null
+  // The control that opened the current overlay, so closing returns focus.
+  let overlayOpener = null;
+
+  function rememberOpener() {
+    const el = document.activeElement;
+    if (el && el !== document.body && !el.closest('#palette, #favorites-panel')) overlayOpener = el;
+  }
+
+  function restoreOpenerFocus() {
+    const el = overlayOpener;
+    overlayOpener = null;
+    if (el && el.isConnected) el.focus({ preventScroll: true });
+  }
 
   function setScrim(visible) {
     scrim.classList.toggle('hidden', !visible);
@@ -297,7 +311,9 @@
 
   async function showPlaceOnGlobe(place, options = {}) {
     closeOverlay();
-    await loadMapLibreGlobe();
+    try {
+      await loadMapLibreGlobe();
+    } catch {}
     if (!openGlobePlace) {
       showToast('The globe could not be loaded. Please try again.');
       return false;
@@ -333,7 +349,8 @@
   let paletteTimer = null;
 
   function openPalette(prefill = '') {
-    if (activeOverlay === 'favorites') closeFavorites();
+    rememberOpener();
+    if (activeOverlay === 'favorites') closeFavorites({ keepOpener: true });
     activeOverlay = 'palette';
     palette.classList.remove('hidden');
     setScrim(true);
@@ -344,7 +361,7 @@
     runPalette(prefill);
   }
 
-  function closePalette() {
+  function closePalette({ keepOpener = false } = {}) {
     if (activeOverlay !== 'palette') return;
     activeOverlay = null;
     paletteToken++;
@@ -353,6 +370,7 @@
     paletteInput.setAttribute('aria-expanded', 'false');
     paletteInput.blur();
     setScrim(false);
+    if (!keepOpener) restoreOpenerFocus();
 
     const finish = () => {
       if (activeOverlay === 'palette') return;
@@ -542,21 +560,25 @@
 
   // ===== Favorites sheet =====
   function openFavorites() {
-    if (activeOverlay === 'palette') closePalette();
+    rememberOpener();
+    if (activeOverlay === 'palette') closePalette({ keepOpener: true });
     activeOverlay = 'favorites';
     renderFavorites();
     favoritesPanel.classList.remove('hidden');
     setScrim(true);
     requestAnimationFrame(() => favoritesPanel.classList.add('is-visible'));
     btnFavorites.setAttribute('aria-expanded', 'true');
+    const closeBtn = $('#favorites-close');
+    if (closeBtn) closeBtn.focus({ preventScroll: true });
   }
 
-  function closeFavorites() {
+  function closeFavorites({ keepOpener = false } = {}) {
     if (activeOverlay !== 'favorites') return;
     activeOverlay = null;
     favoritesPanel.classList.remove('is-visible');
     btnFavorites.setAttribute('aria-expanded', 'false');
     setScrim(false);
+    if (!keepOpener) restoreOpenerFocus();
 
     const finish = () => {
       if (activeOverlay === 'favorites') return;
@@ -1189,8 +1211,14 @@ void main() {
     })().catch((err) => {
       // Let a later call retry instead of reusing a rejected promise forever
       mapLibreGlobePromise = null;
+      console.error('Failed to start globe:', err);
       const wrap = $('#globe-wrap');
       if (wrap) wrap.classList.remove('is-loading');
+      // Usually no WebGL: say so instead of leaving an empty globe.
+      const container = $('#globe-3d');
+      if (container) {
+        container.innerHTML = '<div class="empty-state"><p>Failed to load the globe. Your browser may not support WebGL.</p></div>';
+      }
       throw err;
     });
     return mapLibreGlobePromise;
@@ -1293,7 +1321,9 @@ void main() {
       const data = localStorage.getItem(FAV_KEY);
       const raw = data ? JSON.parse(data) : {};
       favorites = {};
-      Object.values(raw).forEach((f) => {
+      Object.values(raw && typeof raw === 'object' ? raw : {}).forEach((f) => {
+        // Skip a corrupt entry instead of dropping the whole list.
+        if (!f || typeof f !== 'object') return;
         if (f.id) {
           favorites[f.id] = f;
         } else if (f.stationuuid) {
@@ -1325,6 +1355,8 @@ void main() {
   }
 
   function toggleFavorite(station) {
+    // Start from what's stored, so a change made in another tab survives.
+    loadFavorites();
     const id = station.id;
     if (favorites[id]) {
       delete favorites[id];
@@ -1337,9 +1369,23 @@ void main() {
     updateFavoriteButtons(id);
 
     if (activeOverlay === 'favorites') {
+      const hadFocus = favoritesList.contains(document.activeElement);
       renderFavorites();
+      if (hadFocus) {
+        const target = $(`#favorites-list .btn-fav[data-id="${CSS.escape(String(id))}"]`) || $('#favorites-close');
+        if (target) target.focus({ preventScroll: true });
+      }
     }
   }
+
+  // Another tab changed favorites: pick them up here too.
+  window.addEventListener('storage', (e) => {
+    if (e.key !== FAV_KEY) return;
+    loadFavorites();
+    $$('.btn-fav').forEach((btn) => updateFavoriteButtons(btn.dataset.id));
+    updatePlayerFavButton();
+    if (activeOverlay === 'favorites') renderFavorites();
+  });
 
   function isFavorite(id) {
     return !!favorites[id];
@@ -1619,6 +1665,22 @@ void main() {
     }, 100);
   }
 
+  // Bring back the last station in the player, paused. Browsers block
+  // autoplay, and Play on a never-loaded station starts it via playStation.
+  function restoreLastStation() {
+    let station = null;
+    try {
+      station = JSON.parse(localStorage.getItem(LAST_STATION_KEY) || 'null');
+    } catch {}
+    if (!station || typeof station !== 'object' || !station.id || !station.name) return;
+    currentStation = station;
+    currentList = [station];
+    currentIndex = 0;
+    playerBar.classList.remove('hidden');
+    updatePlayerUI();
+    updateMediaSession(station);
+  }
+
   function togglePlayPause() {
     if (!currentStation) return;
 
@@ -1754,8 +1816,17 @@ void main() {
     volumeSlider.style.setProperty('--volume-level', `${vol}%`);
   }
 
+  // iOS fixes media volume at 1; only the hardware buttons change it.
+  const canSetVolume = (() => {
+    const probe = document.createElement('audio');
+    probe.volume = 0.5;
+    return probe.volume === 0.5;
+  })();
+  if (!canSetVolume && volumeSlider) volumeSlider.hidden = true;
+
   function setVolume(val) {
     audio.volume = val / 100;
+    if (val > 0) audio.muted = false;
     try {
       localStorage.setItem(VOL_KEY, val);
     } catch {}
@@ -1763,22 +1834,21 @@ void main() {
     updateVolumeIcon();
   }
 
+  // `muted` works everywhere, including iOS where `volume` is read-only.
   function toggleMute() {
-    if (audio.volume > 0) {
-      audio.dataset.prevVol = audio.volume;
-      audio.volume = 0;
-      volumeSlider.value = 0;
+    if (audio.muted || audio.volume === 0) {
+      audio.muted = false;
+      if (audio.volume === 0) audio.volume = 0.8;
     } else {
-      const prev = parseFloat(audio.dataset.prevVol) || 0.8;
-      audio.volume = prev;
-      volumeSlider.value = Math.round(prev * 100);
+      audio.muted = true;
     }
+    volumeSlider.value = audio.muted ? 0 : Math.round(audio.volume * 100);
     volumeSlider.style.setProperty('--volume-level', `${volumeSlider.value}%`);
     updateVolumeIcon();
   }
 
   function updateVolumeIcon() {
-    const muted = audio.volume === 0;
+    const muted = audio.muted || audio.volume === 0;
     volIcon.classList.toggle('hidden', muted);
     volMuteIcon.classList.toggle('hidden', !muted);
   }
