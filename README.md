@@ -117,15 +117,18 @@ browser CORS access and `python -m http.server` cannot run Pages Functions.
 | `/api/ara/content/places` | All places (cities) with country, coordinates, and station count |
 | `/api/ara/content/page/{placeId}/channels` | Stations in a place |
 | `/api/search?q=...` | Search stations and places |
-| `https://radio.garden/api/ara/content/listen/{channelId}/channel.mp3` | Redirects to the station's live stream |
+| `/listen?id={channelId}` | Follows Radio Garden's `listen/{channelId}/channel.mp3` redirect and streams the audio |
+| `/listen?url={streamUrl}` | Streams a snapshot URL; only hosts in `data/stream-hosts.json` are allowed |
 
-> **⚠️ Unofficial API:** The Radio Garden API is **not official** — it is the internal, undocumented API behind radio.garden. It is not affiliated with, endorsed by, or supported by Radio Garden, and it **may be changed, restricted, or removed at any time without notice**. If that happens, parts of OpenRadio may stop working until the app is updated. The same-origin proxy only permits the three JSON endpoints listed above; the audio redirect remains a direct Radio Garden request.
+> **⚠️ Unofficial API:** The Radio Garden API is **not official** — it is the internal, undocumented API behind radio.garden. It is not affiliated with, endorsed by, or supported by Radio Garden, and it **may be changed, restricted, or removed at any time without notice**. If that happens, parts of OpenRadio may stop working until the app is updated. The `/api` proxy only permits the three JSON endpoints listed above, and `/listen` only fetches Radio Garden's listen redirect or snapshot stream hosts.
 >
 > If you run into any problems, please report them directly via [GitHub Issues](https://github.com/PierrunoYT/openradio.world/issues).
 
-Live API playback uses Radio Garden's `listen` endpoint so streams resolve to
-their current URL. Snapshot playback uses its archived direct URL, with
-plain-HTTP streams routed through the restricted `/listen` proxy on HTTPS.
+On the deployed site, live playback goes through `/listen?id=…`, which follows
+Radio Garden's `listen` redirect server-side so streams resolve to their current
+URL. Snapshot playback uses its archived direct URL, with plain-HTTP streams
+routed through `/listen?url=…` (HTTPS streams play directly). Local development
+requests Radio Garden's `listen` URL directly.
 
 ## Browser Support
 
