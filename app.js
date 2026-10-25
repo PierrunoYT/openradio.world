@@ -127,9 +127,10 @@
     return snapshotPlacesPromise;
   }
 
-  async function loadSnapshot() {
-    if (snapshot) return snapshot;
-    if (!snapshotPromise) {
+  // `quiet` is for callers that aren't falling back from the JSON API, such
+  // as the stream fallback, so they don't claim the API is down.
+  async function loadSnapshot({ quiet = false } = {}) {
+    if (!snapshot && !snapshotPromise) {
       snapshotPromise = (async () => {
         const [places, stationsRes] = await Promise.all([
           loadSnapshotPlaces(),
@@ -145,17 +146,18 @@
         });
 
         snapshot = { places, stations, byPlace };
-        if (LIVE_API_ENABLED && !snapshotNotified) {
-          snapshotNotified = true;
-          showToast('Live API unreachable — using local snapshot');
-        }
         return snapshot;
       })().catch((err) => {
         snapshotPromise = null;
         throw err;
       });
     }
-    return snapshotPromise;
+    const snap = snapshot || await snapshotPromise;
+    if (!quiet && LIVE_API_ENABLED && !snapshotNotified) {
+      snapshotNotified = true;
+      showToast('Live API unreachable — using local snapshot');
+    }
+    return snap;
   }
 
   async function getPlaces() {
@@ -1595,6 +1597,9 @@ void main() {
       if (playPromise !== undefined) {
         playPromise.catch((err) => {
           if (generation !== playGeneration) return;
+          // An unplayable source also fires the audio 'error' event, which
+          // owns retries and the snapshot fallback for that case.
+          if (err.name === 'NotSupportedError') return;
           console.warn('Playback attempt failed:', err.message);
 
           if (retryCount < MAX_RETRIES && currentStation) {
@@ -1619,6 +1624,9 @@ void main() {
 
     if (isPlaying) {
       audio.pause();
+    } else if (audio.error || !audio.currentSrc) {
+      // The last stream failed; play() on it would just reject again.
+      playStation(currentStation);
     } else {
       audio.play().catch(() => {
         showToast('Playback failed. Try again.');
@@ -1673,6 +1681,8 @@ void main() {
   audio.addEventListener('playing', () => {
     isPlaying = true;
     isLoading = false;
+    retryCount = 0;
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
     updatePlayerUI();
     startPlayerWave();
   });
@@ -1680,6 +1690,7 @@ void main() {
   audio.addEventListener('pause', () => {
     isPlaying = false;
     isLoading = false;
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
     updatePlayerUI();
     stopPlayerWave();
   });
@@ -1709,7 +1720,7 @@ void main() {
     if (!currentStation.streamUrl && !triedSnapshotStream) {
       triedSnapshotStream = true;
       try {
-        const snap = await loadSnapshot();
+        const snap = await loadSnapshot({ quiet: true });
         if (generation !== playGeneration) return;
         const saved = snap.stations.find((s) => s.id === currentStation.id);
         if (saved && saved.streamUrl) {
@@ -1782,8 +1793,8 @@ void main() {
       album: 'OpenRadio',
     });
 
-    navigator.mediaSession.setActionHandler('play', () => togglePlayPause());
-    navigator.mediaSession.setActionHandler('pause', () => togglePlayPause());
+    navigator.mediaSession.setActionHandler('play', () => { if (!isPlaying) togglePlayPause(); });
+    navigator.mediaSession.setActionHandler('pause', () => audio.pause());
     navigator.mediaSession.setActionHandler('previoustrack', () => playPrev());
     navigator.mediaSession.setActionHandler('nexttrack', () => playNext());
   }
@@ -1927,6 +1938,10 @@ void main() {
       }
 
       if (e.target.tagName === 'INPUT' || e.target.isContentEditable) return;
+      // Leave Cmd/Ctrl/Alt combos (find, save, minimize…) to the browser.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // A focused map pans with the arrow keys; don't also switch stations.
+      if ((e.key || '').startsWith('Arrow') && e.target.closest && e.target.closest('.maplibregl-map')) return;
 
       switch (e.key) {
         case ' ':
