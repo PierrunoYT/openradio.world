@@ -776,6 +776,7 @@ body:has(#player-bar.hidden) #globe-info-panel { bottom: calc(var(--edge) + 44px
 /* Touch devices have no hover to reveal them, so never hide them there. */
 @media (hover: none) {
   .btn-fav, .btn-globe { opacity: 1; }
+  #search-trigger-key { display: none; }
 }
 
 .btn-fav:hover { background: var(--ink-600); color: var(--danger); }
@@ -1469,7 +1470,8 @@ body:has(#player-bar.hidden) .sheet { bottom: var(--edge); }
     box-shadow: 0 -30px 70px rgba(0, 0, 0, 0.55);
   }
 
-  #view-globe.has-stations ~ #player-bar { right: var(--edge); }
+  #view-globe.has-stations ~ #player-bar,
+  #view-globe.has-stations ~ #topbar { right: var(--edge); }
 
   /* The player dock now floats over the bottom of the panel; pad the list
      so its last rows can scroll clear of it. */
