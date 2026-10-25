@@ -88,8 +88,11 @@ export async function onRequestGet({ request }) {
   }
 
   // Pass the audio through, keeping only the headers that matter
+  // Keep the upstream audio type: many streams are AAC, and Safari refuses
+  // AAC labelled as MPEG. Anything that isn't audio falls back to MPEG.
   const headers = new Headers();
-  headers.set('Content-Type', 'audio/mpeg');
+  const type = upstream.headers.get('Content-Type') || '';
+  headers.set('Content-Type', /^(audio\/|application\/ogg)/i.test(type) ? type : 'audio/mpeg');
   headers.set('Cache-Control', 'no-store');
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('Content-Security-Policy', "sandbox; default-src 'none'");
