@@ -1461,7 +1461,8 @@ body:has(#player-bar.hidden) .sheet { bottom: var(--edge); }
     top: auto;
     left: 0;
     right: 0;
-    height: 58%;
+    height: auto;
+    max-height: 58%;
     width: auto;
     border-left: none;
     border-top: 1px solid var(--line-2);

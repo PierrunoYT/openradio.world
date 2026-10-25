@@ -240,11 +240,16 @@
     }
   }
 
+  // Lowercase and strip accents, so "zurich" finds Zürich.
+  function fold(str) {
+    return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+
   async function searchStations(query) {
     if (!LIVE_API_ENABLED) {
-      const q = query.toLowerCase();
+      const q = fold(query);
       return (await loadSnapshot()).stations
-        .filter((s) => s.name.toLowerCase().includes(q) || (s.place && s.place.toLowerCase().includes(q)))
+        .filter((s) => fold(s.name).includes(q) || (s.place && fold(s.place).includes(q)))
         .slice(0, 50);
     }
     try {
@@ -255,9 +260,9 @@
         .map((h) => toStation(h._source.page));
     } catch (err) {
       console.warn('Search API failed, trying local snapshot:', err.message);
-      const q = query.toLowerCase();
+      const q = fold(query);
       return (await loadSnapshot()).stations
-        .filter((s) => s.name.toLowerCase().includes(q) || (s.place && s.place.toLowerCase().includes(q)))
+        .filter((s) => fold(s.name).includes(q) || (s.place && fold(s.place).includes(q)))
         .slice(0, 50);
     }
   }
@@ -361,12 +366,12 @@
   // Same ranking the globe's own place lookup used: exact prefixes first,
   // then substring hits, with the busiest places breaking ties.
   function matchPlaces(places, raw) {
-    const q = raw.trim().toLowerCase();
+    const q = fold(raw.trim());
     if (!q) return [];
     const scored = [];
     for (const place of places) {
-      const title = (place.title || '').toLowerCase();
-      const country = (place.country || '').toLowerCase();
+      const title = fold(place.title);
+      const country = fold(place.country);
       let score;
       if (title === q) score = 0;
       else if (title.startsWith(q)) score = 1;
