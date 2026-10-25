@@ -1471,6 +1471,13 @@ body:has(#player-bar.hidden) .sheet { bottom: var(--edge); }
 
   #view-globe.has-stations ~ #player-bar { right: var(--edge); }
 
+  /* The player dock now floats over the bottom of the panel; pad the list
+     so its last rows can scroll clear of it. */
+  .place-stations-results {
+    padding-bottom: calc(var(--edge) + var(--player-height) + 20px);
+  }
+  body:has(#player-bar.hidden) .place-stations-results { padding-bottom: 20px; }
+
   /* Pinch-zoom replaces the buttons, but the info popover keeps the
      attribution and legal links reachable, so it stays. */
   #globe-zoom, #globe-hint { display: none; }
