@@ -6,6 +6,16 @@ commit order rather than by version number. Newest change first.
 
 ---
 
+## 2026-11-01
+
+- **A globe that fails mid-load is now torn down** — if globe setup threw
+  after the MapLibre map was created, the failure handler only cleared the
+  cached promise and showed the error message: the map kept running, its
+  wheel and pointer listeners stayed on `#globe-3d`, and a retry stacked a
+  second map and a second set of listeners on top. The handler now removes
+  the map, detaches those listeners, and clears the place/marker hooks so a
+  retry starts clean. The zoom buttons' DOM lookups are also null-guarded.
+
 ## 2026-09-29
 
 - **Corrected the README's "just open index.html" instructions** — opening the

@@ -688,6 +688,12 @@
     }
     if (mapLibreGlobePromise) return mapLibreGlobePromise;
 
+    // Hoisted so the failure handler below can tear down a half-built globe:
+    // otherwise a retry stacks a second map and a second set of listeners.
+    let map = null;
+    const globeListeners = new AbortController();
+    const listenerOptions = { signal: globeListeners.signal };
+
     mapLibreGlobePromise = (async () => {
       const wrap = $('#globe-wrap');
       const container = $('#globe-3d');
@@ -1008,7 +1014,7 @@ void main() {
         1.15,
         Math.log2((fitDiameter * Math.PI * Math.cos((GLOBE_CENTER_LAT * Math.PI) / 180)) / 512),
       );
-      const map = new maplibregl.Map({
+      map = new maplibregl.Map({
         container,
         center: [8, GLOBE_CENTER_LAT],
         zoom: initialZoom,
@@ -1079,7 +1085,7 @@ void main() {
         if (rotateFrame) cancelAnimationFrame(rotateFrame);
         rotateFrame = 0;
       };
-      container.addEventListener('pointerdown', stopAutoRotate);
+      container.addEventListener('pointerdown', stopAutoRotate, listenerOptions);
 
       // Asymmetric wheel zoom: zooming in stays on MapLibre's native scroll
       // handler, which anchors on the cursor even under globe projection, so
@@ -1097,7 +1103,7 @@ void main() {
         const delta = -event.deltaY * lineScale * rate;
         const zoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), map.getZoom() + delta));
         map.easeTo({ zoom, duration: 90, easing: (t) => t });
-      }, { passive: false, capture: true });
+      }, { passive: false, capture: true, ...listenerOptions });
 
       map.on('mousemove', (event) => {
         const point = event.point;
@@ -1186,8 +1192,10 @@ void main() {
         const zoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), map.getZoom() + delta));
         map.jumpTo({ zoom });
       }
-      $('#globe-zoom-in').addEventListener('click', () => zoomBy(1));
-      $('#globe-zoom-out').addEventListener('click', () => zoomBy(-1));
+      const zoomInButton = $('#globe-zoom-in');
+      const zoomOutButton = $('#globe-zoom-out');
+      if (zoomInButton) zoomInButton.addEventListener('click', () => zoomBy(1), listenerOptions);
+      if (zoomOutButton) zoomOutButton.addEventListener('click', () => zoomBy(-1), listenerOptions);
 
       window.__globe = {
         pauseAnimation() {
@@ -1212,6 +1220,15 @@ void main() {
       // Let a later call retry instead of reusing a rejected promise forever
       mapLibreGlobePromise = null;
       console.error('Failed to start globe:', err);
+      // Tear down whatever was built so a retry starts clean.
+      globeListeners.abort();
+      openGlobePlace = null;
+      refreshGlobeMarkers = null;
+      if (map) {
+        try {
+          map.remove();
+        } catch {}
+      }
       const wrap = $('#globe-wrap');
       if (wrap) wrap.classList.remove('is-loading');
       // Usually no WebGL: say so instead of leaving an empty globe.
