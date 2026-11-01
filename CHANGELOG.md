@@ -8,6 +8,12 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-11-01
 
+- **Removed unused country outline data** — `data/countries.geojson`
+  (2.3 MB), `data/countries-lite.geojson`, and the `tools/simplify-geo.mjs`
+  script that produced the lite copy were left over from the globe.gl vector
+  globe that MapLibre replaced on 2026-07-15. Nothing referenced them, but
+  they were still deployed with the site.
+
 - **Bumped the stylesheet cache-bust** — the three 2026-10-25 commits that
   changed `style.css` (mobile station list padding, the mobile top bar, and
   the auto-height mobile panel) didn't bump `style.css?v=`, so returning
