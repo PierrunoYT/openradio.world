@@ -8,6 +8,18 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-11-01
 
+- **README corrected and filled in** — the waveform was described as
+  reacting to the station audio (it has been decorative since the analyser
+  was removed); `Esc` was said to close the station panel (it closes search,
+  favorites, and the globe info panel); MapLibre was credited with "native
+  feature picking" (picking uses the custom layer's GPU id buffer); and local
+  development was said to request Radio Garden's `listen` URL (it plays the
+  snapshot's stream URLs, using `listen` only for stations without one). The
+  README now also mentions resuming the last station and cross-tab favorites,
+  notes that modifier keys bypass the single-key shortcuts, lists `_headers`,
+  `tools/`, `legal.css`, and the legal pages in the project tree, and explains
+  how to refresh the snapshot with `node tools/snapshot.mjs`.
+
 - **Privacy policy and disclaimer brought in line with the app** — the
   privacy policy said localStorage holds favorites, volume, and "a few UI
   preferences"; it actually holds favorites, volume, and the last station you
