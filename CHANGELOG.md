@@ -8,6 +8,16 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-11-01
 
+- **Changelog checked against every commit** — all 122 commits were compared
+  with their entries. Fixed entries that misdescribed their diff (spike
+  footprint radius vs. diameter, place-search ranking order, the half-resolution
+  pick buffer, the 8-second loader cap, where the globe's places come from,
+  the site-wide `nosniff` header, and two overstatements in the 2026-10-25
+  backfill), moved one out-of-order entry, and added entries for changes that
+  had none: the 2026-08-03 touch-picking change, the analyser removal and
+  player bar redesign, the globe renderers tried before MapLibre, the
+  station-loading panel, and the marker styles that preceded the spikes.
+
 - **Removed unused country outline data** — `data/countries.geojson`
   (2.3 MB), `data/countries-lite.geojson`, and the `tools/simplify-geo.mjs`
   script that produced the lite copy were left over from the globe.gl vector
@@ -108,17 +118,17 @@ commit order rather than by version number. Newest change first.
   shortcuts ignored modifier keys, so Ctrl/Cmd+F also toggled the current
   favorite and Ctrl+S jumped the globe. They now only fire without Ctrl, Cmd,
   or Alt held, and arrow keys aimed at the focused map pan it instead of
-  switching stations.
+  switching stations or changing the volume.
 
 - **The stream proxy keeps the real audio type** — `/listen` labelled every
   stream `audio/mpeg`, and Safari refuses to play AAC streams with that
   label. It now passes through upstream `audio/*` and `application/ogg`
   types, falling back to `audio/mpeg` for anything else.
 
-- **Search ignores accents** — typing "zurich" found nothing because
+- **Search ignores accents** — typing "zurich" found no place because
   titles like "Zürich" weren't folded, and about 1,800 places have accents.
   Place matching and the snapshot station search now strip diacritics on
-  both sides.
+  both sides; live station results come from Radio Garden's search as before.
 
 - **The mobile station panel fits its list** — the bottom-docked panel always
   took 58% of the screen, leaving a big empty area for places with one or
@@ -199,6 +209,12 @@ commit order rather than by version number. Newest change first.
   pending timer; stale timers, rejected `play()` promises, and the snapshot
   fallback all bail out when the generation has moved on.
 
+## 2026-08-03
+
+- **Globe dots are easier to tap on phones** — on touch (coarse-pointer)
+  devices the invisible pick target around each city dot grows from 6.5 px to
+  20 px, while the visible dots stay the same size.
+
 ## 2026-07-30 (yet even later still)
 
 - **Guarded the newest DOM lookups in `setupEventListeners()` and `init()`**
@@ -244,6 +260,17 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-07-30 (later)
 
+- **Redrew the social preview card** — The old card advertised a screen that no
+  longer exists: it carried the retired Discover headline ("Find your new
+  favorite frequency."), the deleted hero's orbit artwork, the previous
+  ink-navy palette, and the retired teal accent — while its own caption now
+  promises a globe. The new card shows that globe, drawn from the real
+  directory: every dot is a broadcasting city from `data/places.json`,
+  orthographically projected the same way the app projects them. Typography
+  matches the app (Bricolage Grotesque, Inter, JetBrains Mono), the alt text
+  now describes the image, and `?v=atlas-1` refreshes the scrapers' caches.
+  The PNG came out smaller than the card it replaces.
+
 - **Redesigned the app around the globe — "Atlas"** — The six-view sidebar IA
   (Discover, Globe, Search, Favorites, By Country, By City) is gone. The globe
   is no longer one view among six: it is the app, a canvas that fills the
@@ -272,17 +299,6 @@ commit order rather than by version number. Newest change first.
 
 - **Attribution and legal links moved into the globe's info popover** now that
   there is no sidebar to hold them; the popover stays available on mobile.
-
-- **Redrew the social preview card** — The old card advertised a screen that no
-  longer exists: it carried the retired Discover headline ("Find your new
-  favorite frequency."), the deleted hero's orbit artwork, the previous
-  ink-navy palette, and the retired teal accent — while its own caption now
-  promises a globe. The new card shows that globe, drawn from the real
-  directory: every dot is a broadcasting city from `data/places.json`,
-  orthographically projected the same way the app projects them. Typography
-  matches the app (Bricolage Grotesque, Inter, JetBrains Mono), the alt text
-  now describes the image, and `?v=atlas-1` refreshes the scrapers' caches.
-  The PNG came out smaller than the card it replaces.
 
 ---
 
@@ -329,7 +345,8 @@ commit order rather than by version number. Newest change first.
   claimed `Content-Type` verbatim. The MapLibre GL script and stylesheet
   loaded from jsdelivr now carry Subresource Integrity hashes and
   `crossorigin="anonymous"`, and a new `_headers` file adds a site-wide CSP,
-  `X-Frame-Options: DENY`, and `Referrer-Policy`. Also fixed a stored-XSS-style
+  `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and
+  `Referrer-Policy`. Also fixed a stored-XSS-style
   selector-injection risk (`updateFavoriteButtons` now runs station ids through
   `CSS.escape` before building a `querySelectorAll` string) and two spots
   rendering unsanitized `place.size` as a station count.
@@ -360,7 +377,18 @@ commit order rather than by version number. Newest change first.
   standalone legal pages (`privacy.html`, `terms.html`, `disclaimer.html`)
   covering data handling (localStorage only, no accounts/tracking), acceptable
   use, and the third-party/unofficial-API nature of the station directory and
-  streams. Linked from the sidebar footer and added to `sitemap.xml`.
+  streams, styled by a shared `legal.css`. Linked from the sidebar footer and
+  added to `sitemap.xml`.
+
+- **Player waveform is now decorative** — later the same day the Web Audio
+  analyser was tuned and then removed: the three lines turned white and
+  animate at fixed amplitudes while a station plays, no longer reacting to
+  the stream's audio. Production audio still routes through `/listen`.
+
+- **Player bar redesign** — the station block gained a signal mark and an
+  "On air" label beside a larger waveform canvas, the volume slider shows a
+  filled track, the bar carries `is-playing`/`is-loading` states, and the
+  play button's accessible label tracks Loading/Pause/Play.
 
 - **The player now has a sound-reactive three-line waveform** — low, mid, and
   high frequency energy from the live stream drives three colored waves in the
@@ -406,8 +434,9 @@ commit order rather than by version number. Newest change first.
   way to jump straight to a country or city, so locating a specific place
   meant manually spinning and zooming. A search box in the globe's
   top-right corner now matches against all 12,326 places as you type
-  (prioritizing name matches, then country matches, ranked by station
-  count), and picking a result flies the camera there and opens its
+  (names starting with the query first, then countries starting with it,
+  then names and countries containing it, ties ranked by station count; top
+  8 shown), and picking a result flies the camera there and opens its
   station list — the same flow as clicking a dot directly. Supports
   arrow-key navigation, Enter to pick the top match, and Escape/outside
   click to dismiss. Verified in a headless browser at desktop and mobile
@@ -479,7 +508,7 @@ commit order rather than by version number. Newest change first.
   and the mobile globe view uses dynamic viewport height. Verified in a
   headless browser at phone and tablet sizes with zero horizontal overflow.
 - **UI polish pass** — the app-wide dark theme gained depth and hierarchy:
-  Inter as the interface font, subtle purple/green ambient gradients behind
+  Inter as the interface font (loaded from Google Fonts), subtle purple/green ambient gradients behind
   the content, gradient-tinted station cards with accent hover glow,
   purple-tinted favicon tiles, a gradient active state and hover motion in
   the sidebar nav, a translucent blurred topbar, a glass player bar with an
@@ -510,7 +539,7 @@ commit order rather than by version number. Newest change first.
   hugging the satellite surface at a constant screen size, matching
   radio.garden. The custom WebGL layer now draws a single instanced pass of
   camera-facing dots at ground level (no prisms, no depth pass), keeping the
-  pixel-exact id-buffer picking. Verified in a headless browser: dots render
+  id-buffer picking. Verified in a headless browser: dots render
   across the whole visible hemisphere and hovering one shows its place
   tooltip.
 - **Working asymmetric wheel zoom** — the previous zoom-out fix replaced the
@@ -538,11 +567,12 @@ commit order rather than by version number. Newest change first.
   globe-to-mercator transition at deep zoom, and clip behind the horizon.
   Spikes gain per-wall lighting and a brightened tip, and the map canvas is
   antialiased.
-- **Pixel-exact marker picking** — hovering or clicking renders spike ids
-  into an offscreen buffer and reads the pixel under the pointer, so the hit
-  area is exactly the spike's visible body at any zoom, with correct
+- **Id-buffer marker picking** — hovering or clicking renders spike ids
+  into a half-resolution offscreen buffer and reads the pixel under the
+  pointer, so the hit area follows the spike's visible body at any zoom, with correct
   front-to-back ordering, replacing the earlier screen-space approximation.
-- **Thicker, high-visibility spikes** — footprints widened to 2.6–4.6 km and
+- **Thicker, high-visibility spikes** — footprint radius widened to 2.6–4.6 km
+  (from 1.4–2.5 km) and
   the color switched from muted green to hot pink at full opacity, a hue
   nothing in the satellite imagery competes with.
 - **Full-body column clicks** — clicks anywhere along a column's projected
@@ -552,17 +582,28 @@ commit order rather than by version number. Newest change first.
   MapLibre fill-extrusion spikes with station-weighted heights of 160–400 km,
   tall enough to read at the initial world view without zooming in. The spikes
   are the sole marker at every zoom level; the earlier ground circles and glow
-  layers that blended into the column bases were removed.
-- **Column-body interaction** — hovering or clicking anywhere along a spike's
-  rendered body selects its place, instead of requiring the pointer near the
-  base point, with a small pixel tolerance for thin columns.
+  layers that blended into the column bases were removed. The camera keeps a
+  slight 20° tilt so the markers' height reads.
+- **Spike-only picking** — hover and click now query the spike
+  fill-extrusion layer with a 4-pixel tolerance, replacing the removed circle
+  layers. MapLibre only hit-tests a spike's ground footprint, which **Full-body
+  column clicks** above works around.
 - **Versioned marker style assets** — the application script URL is versioned
   so cached copies of an older invalid marker expression are not reused after
   a globe deployment.
+- **Earlier marker styles (superseded)** — before the spikes, places were
+  drawn as glowing circle markers with an outline and a 12-pixel pick
+  tolerance (briefly enlarged, then halved again), then as raised tiles with
+  depth and sheen circle layers, then as hexagonal and octagonal
+  fill-extrusion columns whose ground circles faded out at mid zoom.
 - **Stable station loading (superseded)** — station data was changed to load
   before the below-globe results panel opened, with existing results left in
   place during updates. The newer side-panel flow described above now opens
   immediately with an in-panel loading indicator instead.
+- **Station list loading panel (superseded)** — opening a place first showed
+  a dedicated "Loading radio stations…" panel that crossfaded into the
+  results, skipped the animation for reduced-motion users, and ignored
+  responses from places no longer selected.
 - **Globe-only marker picking** — hover and click candidates must be on the
   visible hemisphere, preventing location tooltips from appearing outside the
   globe.
@@ -571,8 +612,10 @@ commit order rather than by version number. Newest change first.
 - **Natural single-station cards** — the completed results grid no longer
   inherits the loading panel's height, so a lone station keeps normal card
   proportions instead of stretching into a large block.
-- **Stable globe viewport (superseded on desktop)** — station results were
-  moved below a fixed-size map to prevent viewport changes. The newer desktop
+- **Stable globe viewport (superseded on desktop)** — the globe, which had
+  been stretched to fill the content area, was given a fixed full height (60vh
+  on phones) so opening station results below it no longer shrinks the map
+  viewport. The newer desktop
   layout described above intentionally gives the stations their own side pane;
   the stacked mobile layout still keeps results below the globe.
 - **Polished imagery credit** — the Esri attribution now uses a compact glass
@@ -599,11 +642,17 @@ commit order rather than by version number. Newest change first.
   level-of-detail tile pyramid up to level 19, so finer imagery streams in as
   the camera approaches instead of stretching one global image.
 - **Synchronized loading** — the loader remains visible until initial imagery
-  tiles and station points have rendered together.
+  tiles and station points have rendered together, or for at most 8 seconds.
 - **Lower background cost** — animation stops whenever another app view is
   open, and render resolution is capped on high-DPI screens.
 - **Faster first open** — MapLibre warms during browser idle time, while the
-  globe still loads only the places snapshot rather than the station catalog.
+  globe loads only the places list (live API, or `data/places.json` when
+  falling back) rather than the 10 MB station snapshot.
+- **Renderer iterations (superseded)** — before MapLibre, the globe went
+  through a NASA Blue Marble textured canvas, vendored globe.gl with Natural
+  Earth country vectors and zoom-scaled points, a dependency-free Canvas 2D
+  renderer, globe.gl again with a canvas marker overlay, and CesiumJS with
+  tiled satellite imagery.
 - **Globe view** — an interactive 3D globe in the style of radio.garden as
   a new sidebar entry: drag to spin, scroll or use the +/−
   buttons to zoom, hover a city for its name and station count, click a
