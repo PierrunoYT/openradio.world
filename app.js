@@ -1831,6 +1831,7 @@ void main() {
     volumeSlider.value = vol;
     audio.volume = vol / 100;
     volumeSlider.style.setProperty('--volume-level', `${vol}%`);
+    updateVolumeIcon();
   }
 
   // iOS fixes media volume at 1; only the hardware buttons change it.
@@ -1865,6 +1866,8 @@ void main() {
   }
 
   function updateVolumeIcon() {
+    // Called from init(), so a missing icon must not abort startup.
+    if (!volIcon || !volMuteIcon) return;
     const muted = audio.muted || audio.volume === 0;
     volIcon.classList.toggle('hidden', muted);
     volMuteIcon.classList.toggle('hidden', !muted);

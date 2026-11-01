@@ -8,6 +8,10 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-11-01
 
+- **The mute icon now matches a saved volume of 0** — `loadVolume()` set the
+  slider and audio volume but never refreshed the speaker icon, so returning
+  with the volume at 0 showed the unmuted icon until the volume changed.
+
 - **A globe that fails mid-load is now torn down** — if globe setup threw
   after the MapLibre map was created, the failure handler only cleared the
   cached promise and showed the error message: the map kept running, its
