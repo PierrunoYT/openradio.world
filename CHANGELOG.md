@@ -8,6 +8,17 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-11-01
 
+- **Privacy policy and disclaimer brought in line with the app** — the
+  privacy policy said localStorage holds favorites, volume, and "a few UI
+  preferences"; it actually holds favorites, volume, and the last station you
+  played (restored, paused, on the next visit), and no UI preferences. The
+  disclaimer referred to station genres, logos, and favicons, none of which
+  the app has, and said the stream proxy exists only for HTTPS compatibility,
+  when it also resolves every live station's current stream address. Both
+  pages' "Last updated" dates now reflect these edits (the privacy policy
+  had also gained its third-party assets section on 2026-09-29 without a
+  date change).
+
 - **The mute icon now matches a saved volume of 0** — `loadVolume()` set the
   slider and audio volume but never refreshed the speaker icon, so returning
   with the volume at 0 showed the unmuted icon until the volume changed.
