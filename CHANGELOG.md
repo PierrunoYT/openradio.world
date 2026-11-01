@@ -8,6 +8,11 @@ commit order rather than by version number. Newest change first.
 
 ## 2026-11-01
 
+- **Bumped the stylesheet cache-bust** — the three 2026-10-25 commits that
+  changed `style.css` (mobile station list padding, the mobile top bar, and
+  the auto-height mobile panel) didn't bump `style.css?v=`, so returning
+  visitors could keep the old stylesheet. It is now `atlas-3`.
+
 - **README corrected and filled in** — the waveform was described as
   reacting to the station audio (it has been decorative since the analyser
   was removed); `Esc` was said to close the station panel (it closes search,
