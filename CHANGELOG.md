@@ -20,6 +20,85 @@ commit order rather than by version number. Newest change first.
   the map, detaches those listeners, and clears the place/marker hooks so a
   retry starts clean. The zoom buttons' DOM lookups are also null-guarded.
 
+## 2026-10-25
+
+- **README now describes how playback is actually routed** — the endpoint
+  table listed Radio Garden's `listen` URL as a direct request, but the
+  deployed site plays through `/listen?id=…`, which follows that redirect
+  server-side. The table now lists both `/listen?id=` and `/listen?url=`
+  (snapshot streams, limited to hosts in `data/stream-hosts.json`), and notes
+  that https snapshot streams play directly and local development still
+  requests Radio Garden's `listen` URL directly.
+
+- **The last station comes back on reload** — the player restores the
+  station from the previous visit, paused (browsers block autoplay); pressing
+  Play starts it. `openradio_last_station` was being written on every play
+  but never read before this.
+
+- **Mute works on iOS** — muting set `audio.volume` to 0, which iOS ignores
+  because media volume is read-only there. Mute now uses `audio.muted`, and
+  the volume slider is hidden on devices where it can't change anything.
+
+- **Favorites survive corruption and stay in sync across tabs** — one corrupt
+  stored entry no longer throws away the whole list; `toggleFavorite()`
+  re-reads storage before changing it, so it can't overwrite another tab's
+  edit; and a `storage` listener picks up changes made in other tabs.
+
+- **The globe says when it can't start** — a failure while creating the map
+  (usually no WebGL) left an empty globe area; it now shows "Failed to load
+  the globe. Your browser may not support WebGL." The rejection from `init()`
+  is handled, and place picks show a toast instead of failing silently.
+
+- **Overlays return focus to whatever opened them** — closing search or
+  favorites puts focus back on the control that opened it. The favorites
+  sheet focuses its close button on open and keeps focus in the list when a
+  row is removed.
+
+- **Play recovers after a failed stream** — pressing Play after a stream
+  failed called `play()` on the broken element, which only rejected again. It
+  now restarts the station.
+
+- **Broken streams no longer run two retry loops** — a failing source fires
+  the audio `error` event and also rejects `play()` with `NotSupportedError`,
+  and both handlers retried against the same budget. The `error` handler now
+  owns retries and the snapshot fallback, and that fallback no longer shows
+  the "Live API unreachable" toast, since the API isn't what failed. The
+  retry budget also resets once a stream plays, so a later dropout can retry.
+
+- **Lock-screen and headphone controls behave** — the media-session Pause
+  action toggled playback, so it could start a loading stream instead of
+  pausing it. Pause now always pauses, Play only plays, and the playback
+  state is reported to the OS.
+
+- **Keyboard shortcuts leave browser shortcuts alone** — single-key
+  shortcuts ignored modifier keys, so Ctrl/Cmd+F also toggled the current
+  favorite and Ctrl+S jumped the globe. They now only fire without Ctrl, Cmd,
+  or Alt held, and arrow keys aimed at the focused map pan it instead of
+  switching stations.
+
+- **The stream proxy keeps the real audio type** — `/listen` labelled every
+  stream `audio/mpeg`, and Safari refuses to play AAC streams with that
+  label. It now passes through upstream `audio/*` and `application/ogg`
+  types, falling back to `audio/mpeg` for anything else.
+
+- **Search ignores accents** — typing "zurich" found nothing because
+  titles like "Zürich" weren't folded, and about 1,800 places have accents.
+  Place matching and the snapshot station search now strip diacritics on
+  both sides.
+
+- **The mobile station panel fits its list** — the bottom-docked panel always
+  took 58% of the screen, leaving a big empty area for places with one or
+  two stations. 58% is now a maximum height instead of a fixed one.
+
+- **The mobile top bar isn't squeezed by an open station panel** — on narrow
+  screens the panel docks to the bottom, but the top bar still reserved the
+  desktop side-panel width, collapsing search into an empty circle. The
+  keyboard-shortcut hint is also hidden on touch devices.
+
+- **The mobile station list scrolls clear of the player dock** — the player
+  floats over the bottom-docked panel and hid its last rows; the list is now
+  padded by the dock's height.
+
 ## 2026-09-29
 
 - **Corrected the README's "just open index.html" instructions** — opening the
