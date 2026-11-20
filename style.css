@@ -351,6 +351,7 @@ kbd {
   border-radius: var(--radius-pill);
   font-size: 0.82rem;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 #btn-surprise[aria-busy="true"] svg { animation: spin 0.9s linear infinite; }
@@ -1151,6 +1152,9 @@ body:has(#player-bar.hidden) .sheet { bottom: var(--edge); }
 #view-globe.has-stations ~ #player-bar {
   right: calc(var(--panel-width) + var(--edge));
 }
+
+/* The narrower dock needs the room for the station name more than the wave */
+#view-globe.has-stations ~ #player-bar .player-signal { display: none; }
 
 .player-primary {
   display: flex;

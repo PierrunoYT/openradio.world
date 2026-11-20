@@ -6,6 +6,15 @@ commit order rather than by version number. Newest change first.
 
 ---
 
+## 2026-11-20
+
+- **Fixed cramped chrome while a station panel is docked** — the narrower
+  top bar squeezed the "Surprise me" pill until its label wrapped onto two
+  lines; pill buttons now never wrap, and the search field shrinks instead.
+  The narrower player dock left the station name about 50px, so it read
+  "Ambi Natu…"; the decorative On air wave now hides while the panel is
+  open. Bumped `style.css?v=` to `atlas-4`.
+
 ## 2026-11-01
 
 - **Changelog checked against every commit** — all 122 commits were compared
