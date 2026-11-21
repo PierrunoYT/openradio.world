@@ -324,11 +324,14 @@
 
   async function showStationOnGlobe(station) {
     const places = await getPlaces();
+    // A restored or migrated station may lack place/country entirely.
+    const stationPlace = String(station.place || '').toLocaleLowerCase();
+    const stationCountry = String(station.country || '').toLocaleLowerCase();
     const place = (station.placeId && places.find((candidate) => candidate.id === station.placeId))
-      || places.find((candidate) => (
-        candidate.title.toLocaleLowerCase() === station.place.toLocaleLowerCase()
-        && candidate.country.toLocaleLowerCase() === station.country.toLocaleLowerCase()
-      ));
+      || (stationPlace && places.find((candidate) => (
+        candidate.title.toLocaleLowerCase() === stationPlace
+        && candidate.country.toLocaleLowerCase() === stationCountry
+      )));
     if (!place) {
       showToast('This station location is not available on the globe.');
       return false;
@@ -2047,16 +2050,12 @@ void main() {
           playNext();
           break;
         case 'ArrowUp':
-          e.preventDefault();
-          if (volumeSlider) {
-            volumeSlider.value = Math.min(100, parseInt(volumeSlider.value, 10) + 5);
-            setVolume(volumeSlider.value);
-          }
-          break;
         case 'ArrowDown':
           e.preventDefault();
           if (volumeSlider) {
-            volumeSlider.value = Math.max(0, parseInt(volumeSlider.value, 10) - 5);
+            // Step from the real volume: muting parks the slider at 0.
+            const step = e.key === 'ArrowUp' ? 5 : -5;
+            volumeSlider.value = Math.min(100, Math.max(0, Math.round(audio.volume * 100) + step));
             setVolume(volumeSlider.value);
           }
           break;

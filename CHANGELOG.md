@@ -6,6 +6,17 @@ commit order rather than by version number. Newest change first.
 
 ---
 
+## 2026-11-21
+
+- **Locate works for stations without a place** — a remembered or migrated
+  station with no `place` or `country` threw inside the globe lookup, so the
+  locate button said "The globe could not be loaded". It now says the
+  station's location isn't on the globe.
+
+- **Volume keys resume from the real volume after muting** — muting parks the
+  slider at 0, so ↑ jumped to 5% instead of stepping up from the volume you
+  had. ↑/↓ now step from the actual volume. Bumped `app.js?v=` to `atlas-12`.
+
 ## 2026-11-20
 
 - **Fixed cramped chrome while a station panel is docked** — the narrower
